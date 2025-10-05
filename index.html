@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Análisis - Hospital del Móvil</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="main-header">
+        <img src="https://i.imgur.com/cqRWu7l.png" alt="Logo Hospital del Móvil" class="header-logo">
+        <div class="header-text">
+            <h1>Dashboard de Análisis de Negocio</h1>
+            <p class="subtitle">Hospital del Móvil</p>
+        </div>
+    </header>
+
+    <main class="container">
+        <h2>Análisis de Recepción de Equipos</h2>
+        <p class="info-bar">Visualización interactiva de los datos de la hoja "Respuestas de Formulario 6".</p>
+
+        <div id="kpi-container" class="kpi-grid">
+            <div class="kpi-card">
+                <h4>Total de Servicios</h4>
+                <p id="total-servicios">Calculando...</p>
+            </div>
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-container">
+                <h3>Servicios por Tipo</h3>
+                <canvas id="serviciosChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <h3>Equipos por Marca</h3>
+                <canvas id="marcasChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <h3>Top 5 Modelos Recibidos</h3>
+                <div id="topModelsContainer">
+                    <ol id="topModelsList">
+                        </ol>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="main-footer">
+        <p>© 2025 Hospital del Móvil - Dashboard de Análisis de Negocio</p>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/papaparse/5.3.2/papaparse.min.js"></script>
+    
+    <script src="script.js"></script>
+</body>
+</html>
