@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', function () {
 
-    const googleSheetUrl = 'PEGA_AQUÍ_LA_URL_DE_TU_CSV_PUBLICADO';
+    const googleSheetUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRxKT2sTncuJZP4_Bov1Gw1j7ixqNTfW7yGNn8nmAz8gDPauVeBt-8zqCEZWABXI0-BBDEQ4eTvZZkV/pub?output=csv';
 
     // --- VARIABLES GLOBALES ---
     let originalData = []; // Almacenará todos los datos sin filtrar.
