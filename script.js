@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // --- CONFIGURACIÓN ---
     // ¡IMPORTANTE! Pega aquí la URL que obtuviste de Google Sheets.
-    const googleSheetUrl = 'PEGA_AQUÍ_LA_URL_DE_TU_CSV_PUBLICADO';
+    const googleSheetUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRxKT2sTncuJZP4_Bov1Gw1j7ixqNTfW7yGNn8nmAz8gDPauVeBt-8zqCEZWABXI0-BBDEQ4eTvZZkV/pub?output=csv';
 
     // Función para obtener y procesar los datos del CSV.
     function fetchData() {
