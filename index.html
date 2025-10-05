@@ -20,9 +20,10 @@
 
     <main class="container">
         <nav class="tab-nav">
-            <button class="tab-button active" data-tab="servicios">Solicitud de Servicios</button>
-            <button class="tab-button" data-tab="compras">Compras y Gastos</button>
-            <button class="tab-button" data-tab="anticipos">Anticipos y Refacciones</button>
+            <button class="tab-button" data-tab="servicios">Servicios</button>
+            <button class="tab-button" data-tab="compras">Compras</button>
+            <button class="tab-button" data-tab="anticipos">Anticipos</button>
+            <button class="tab-button active" data-tab="ventas">Ventas</button>
         </nav>
 
         <section class="filters-container">
@@ -44,27 +45,23 @@
             </div>
         </section>
 
-        <div id="servicios-content" class="tab-content active">
+        <div id="servicios-content" class="tab-content"></div>
+        <div id="compras-content" class="tab-content"></div>
+        <div id="anticipos-content" class="tab-content"></div>
+        <div id="ventas-content" class="tab-content active">
+            <div class="specific-filter-container">
+                <label class="switch">
+                    <input type="checkbox" id="convenio-filter" checked>
+                    <span class="slider"></span>
+                </label>
+                <label for="convenio-filter">Incluir ventas por Convenio</label>
             </div>
-
-        <div id="compras-content" class="tab-content">
-            </div>
-
-        <div id="anticipos-content" class="tab-content">
-            <section id="anticipos-kpi-container" class="kpi-grid"></section>
-            <section id="anticipos-table-container" class="table-container"></section>
+            <section id="ventas-kpi-container" class="kpi-grid"></section>
+            <section id="ventas-charts-grid" class="charts-grid"></section>
+            <section id="ventas-table-container" class="table-container"></section>
         </div>
     </main>
 
-    <footer class="main-footer">
-        <p>© 2025 Hospital del Móvil - Dashboard de Análisis de Negocio</p>
-    </footer>
-
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/papaparse/5.3.2/papaparse.min.js"></script>
-    <script src="script.js"></script>
-</body>
-</html>
     <footer class="main-footer">
         <p>© 2025 Hospital del Móvil - Dashboard de Análisis de Negocio</p>
     </footer>
