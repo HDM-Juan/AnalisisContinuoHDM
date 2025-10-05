@@ -19,7 +19,20 @@
     </header>
 
     <main class="container">
+        <nav class="tab-nav">
+            <button class="tab-button active" data-tab="servicios">Solicitud de Servicios</button>
+            <button class="tab-button" data-tab="compras">Compras y Gastos</button>
+        </nav>
+
         <section class="filters-container">
+            <div class="filter-group">
+                <label for="validez-filter">Estado de Folios:</label>
+                <select id="validez-filter">
+                    <option value="validos">Solo Válidos</option>
+                    <option value="cancelados">Solo Cancelados</option>
+                    <option value="todos">Todos</option>
+                </select>
+            </div>
             <div class="filter-group">
                 <label for="startDate">Fecha Inicio:</label>
                 <input type="date" id="startDate">
@@ -28,21 +41,31 @@
                 <label for="endDate">Fecha Fin:</label>
                 <input type="date" id="endDate">
             </div>
-            <div class="filter-group">
-                <label for="serviceTypeFilter">Tipo de Servicio:</label>
-                <select id="serviceTypeFilter">
-                    <option value="todos">Todos</option>
-                </select>
-            </div>
         </section>
 
-        <section id="kpi-container" class="kpi-grid">
-            <div class="kpi-card">
-                <h4>Total de Servicios</h4>
-                <p id="total-servicios">...</p>
+        <div id="servicios-content" class="tab-content active">
+            <div class="filter-group">
+                <label for="serviceTypeFilter">Filtrar por Servicio:</label>
+                <select id="serviceTypeFilter"><option value="todos">Todos</option></select>
             </div>
-            <div class="kpi-card">
-                <h4>Puntualidad Diagnóstico</h4>
-                <p id="puntualidad">...</p>
-            </div>
-            <div class="kpi-card">
+            <section id="kpi-container" class="kpi-grid"></section>
+            <section class="charts-grid"></section>
+            <section class="cost-analysis-section"></section>
+        </div>
+
+        <div id="compras-content" class="tab-content">
+            <section id="compras-kpi-container" class="kpi-grid"></section>
+            <section id="compras-charts-grid" class="charts-grid"></section>
+            <section id="compras-table-container" class="table-container"></section>
+        </div>
+    </main>
+
+    <footer class="main-footer">
+        <p>© 2025 Hospital del Móvil - Dashboard de Análisis de Negocio</p>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/papaparse/5.3.2/papaparse.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
