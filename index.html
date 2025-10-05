@@ -19,7 +19,7 @@
     </header>
 
     <main class="container">
-        <div class="filters-container">
+        <section class="filters-container">
             <div class="filter-group">
                 <label for="startDate">Fecha Inicio:</label>
                 <input type="date" id="startDate">
@@ -32,11 +32,11 @@
                 <label for="serviceTypeFilter">Tipo de Servicio:</label>
                 <select id="serviceTypeFilter">
                     <option value="todos">Todos</option>
-                    </select>
+                </select>
             </div>
-        </div>
+        </section>
 
-        <div id="kpi-container" class="kpi-grid">
+        <section id="kpi-container" class="kpi-grid">
             <div class="kpi-card">
                 <h4>Total de Servicios</h4>
                 <p id="total-servicios">...</p>
@@ -46,36 +46,3 @@
                 <p id="puntualidad">...</p>
             </div>
             <div class="kpi-card">
-                <h4>Tiempo Promedio Cierre</h4>
-                <p id="tiempo-promedio">...</p>
-            </div>
-        </div>
-
-        <div class="charts-grid">
-            <div class="chart-container">
-                <h3>Servicios por Tipo</h3>
-                <canvas id="serviciosChart"></canvas>
-            </div>
-            <div class="chart-container">
-                <h3>Equipos por Marca</h3>
-                <canvas id="marcasChart"></canvas>
-            </div>
-            <div class="chart-container">
-                <h3>Top 5 Modelos Recibidos</h3>
-                <div id="topModelsContainer">
-                    <ol id="topModelsList"></ol>
-                </div>
-            </div>
-        </div>
-    </main>
-
-    <footer class="main-footer">
-        <p>© 2025 Hospital del Móvil - Dashboard de Análisis de Negocio</p>
-    </footer>
-
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/papaparse/5.3.2/papaparse.min.js"></script>
-    <script src="script.js"></script>
-</body>
-</html>
-</html>
