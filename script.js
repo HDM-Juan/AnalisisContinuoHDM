@@ -1,11 +1,13 @@
 document.addEventListener('DOMContentLoaded', function () {
     // --- URLs DE DATOS ---
+    const toProxyUrl = (originalUrl) => `/api/data?url=${encodeURIComponent(originalUrl)}`;
     const gid_base = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRxKT2sTncuJZP4_Bov1Gw1j7ixqNTfW7yGNn8nmAz8gDPauVeBt-8zqCEZWABXI0-BBDEQ4eTvZZkV/pub?single=true&output=csv';
-    const serviciosUrl = `${gid_base}&gid=748915905`;
-    const egresosUrl = `${gid_base}&gid=1961448383`;
-    const anticiposUrl = `${gid_base}&gid=46329458`;
-    const ventasUrl = `${gid_base}&gid=681275414`;
-    const detalleVentaUrl = `${gid_base}&gid=553669204`;
+
+    const serviciosUrl = toProxyUrl(`${gid_base}&gid=748915905`);
+    const egresosUrl = toProxyUrl(`${gid_base}&gid=1961448383`);
+    const anticiposUrl = toProxyUrl(`${gid_base}&gid=46329458`);
+    const ventasUrl = toProxyUrl(`${gid_base}&gid=681275414`);
+    const detalleVentaUrl = toProxyUrl(`${gid_base}&gid=553669204`);
 
     // --- VARIABLES GLOBALES ---
     let originalData = {};
