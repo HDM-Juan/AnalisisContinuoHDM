@@ -23,6 +23,8 @@ body { font-family: 'Roboto', sans-serif; background-color: #f4f4f4; color: #333
 .filter-group { display: flex; flex-direction: column; }
 .filter-group label { font-size: 0.9em; color: #666; margin-bottom: 5px; }
 .filter-group input[type="date"], .filter-group select { padding: 8px; border: 1px solid #ccc; border-radius: 5px; font-family: 'Roboto', sans-serif; font-size: 1em; }
+.filter-button { padding: 8px 20px; border: none; background-color: #B22222; color: white; border-radius: 5px; cursor: pointer; font-weight: 500; font-size: 1em; transition: background-color 0.3s; align-self: flex-end; }
+.filter-button:hover { background-color: #8B1A1A; }
 .folio-filter-status { background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; padding: 10px 15px; border-radius: 5px; display: flex; align-items: center; gap: 10px; font-weight: 500; }
 .folio-filter-status .clear-filter { color: #B22222; text-decoration: underline; cursor: pointer; font-weight: bold; }
 .specific-filter-container { background-color: #f8f9fa; padding: 10px 15px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }

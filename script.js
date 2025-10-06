@@ -23,10 +23,10 @@ document.addEventListener('DOMContentLoaded', function () {
     const validezFilter = document.getElementById('validez-filter');
     const startDateInput = document.getElementById('startDate');
     const endDateInput = document.getElementById('endDate');
-    const convenioFilter = document.getElementById('convenio-filter');
     const tabButtons = document.querySelectorAll('.tab-button');
     const tabContents = document.querySelectorAll('.tab-content');
     const folioFilterStatus = document.getElementById('folio-filter-status');
+    const applyFiltersButton = document.getElementById('apply-filters-button');
     
     // --- MAPEO DE COLUMNAS DE FOLIO ---
     const folioColumns = {
@@ -68,6 +68,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 complete: (results) => {
                     const data = results.data;
                     if (!data || data.length === 0) return resolve([]);
+                    // Corregir 'Folio Ventas' a 'Folio Venta' si es necesario
+                    if (data.length > 0 && 'Folio Ventas' in data[0] && !('Folio Venta' in data[0])) {
+                        results.data.forEach(r => {
+                            r['Folio Venta'] = r['Folio Ventas'];
+                            delete r['Folio Ventas'];
+                        });
+                    }
                     const cleanedData = data.filter(r => r[primaryKey] != null && String(r[primaryKey]).trim() !== '');
                     resolve(cleanedData);
                 },
@@ -97,7 +104,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function initializeDashboard() {
         // Listeners del Dashboard
         tabButtons.forEach(button => button.addEventListener('click', () => switchTab(button.dataset.tab)));
-        [validezFilter, startDateInput, endDateInput, convenioFilter].forEach(el => el.addEventListener('change', masterFilterAndUpdate));
+        applyFiltersButton.addEventListener('click', masterFilterAndUpdate);
         folioFilterStatus.addEventListener('click', clearFolioFilter);
         dashboardView.addEventListener('click', handleTraceClick);
 
@@ -136,6 +143,7 @@ document.addEventListener('DOMContentLoaded', function () {
         tabButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabId));
         tabContents.forEach(content => content.classList.toggle('active', content.id === `${tabId}-content`));
         window.location.hash = tabId;
+        masterFilterAndUpdate(); // Actualizar al cambiar de pestaña
     }
 
     function masterFilterAndUpdate() {
@@ -152,8 +160,9 @@ document.addEventListener('DOMContentLoaded', function () {
         let fAnticipos = filterByDate(filterByValidez(originalData.anticipos), 'fechaAnticipoObj');
         let fVentas = filterByDate(filterByValidez(originalData.ventas), 'fechaVentaObj');
         
+        const convenioFilter = document.getElementById('convenio-filter');
         if (convenioFilter && !convenioFilter.checked) {
-            fVentas = fVentas.filter(r => r['¿Convenio?'] !== true);
+            fVentas = fVentas.filter(r => String(r['¿Convenio?']).toUpperCase() === 'FALSE' || !r['¿Convenio?']);
         }
 
         if (activeFolioFilter) {
@@ -185,7 +194,6 @@ document.addEventListener('DOMContentLoaded', function () {
         updateVentasTab(fVentas);
     }
     
-    // --- INICIALIZACIÓN Y ACTUALIZACIÓN DE PESTAÑAS (sin cambios) ---
     function initializeServiciosTab() {
         document.getElementById('servicios-content').innerHTML = `
             <section class="kpi-grid">
@@ -213,7 +221,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 <tbody id="egresos-table-body"></tbody></table></div></section>`;
     }
     function updateComprasTab(data) {
-        const totalEgresos = data.reduce((sum, r) => sum + (r.Monto || 0), 0);
+        const totalEgresos = data.reduce((sum, r) => sum + parseFloat(r.Monto || 0), 0);
         document.getElementById('total-egresos').textContent = `$${totalEgresos.toLocaleString('es-MX')}`;
         document.getElementById('num-compras').textContent = data.length;
         renderTable('egresos-table-body', data, ['Fecha y Hora Compra', 'Folio Egreso', 'Folio Recepción', 'Folio Anticipo', 'Concepto', 'Monto'], folioColumns.compras);
@@ -230,27 +238,66 @@ document.addEventListener('DOMContentLoaded', function () {
                 <tbody id="anticipos-table-body"></tbody></table></div></section>`;
     }
     function updateAnticiposTab(data) {
-        const totalAnticipos = data.reduce((sum, r) => sum + (r['Cantidad Anticipo'] || 0), 0);
+        const totalAnticipos = data.reduce((sum, r) => sum + parseFloat(r['Cantidad Anticipo'] || 0), 0);
         document.getElementById('total-anticipos').textContent = `$${totalAnticipos.toLocaleString('es-MX')}`;
         document.getElementById('num-piezas').textContent = data.length;
         renderTable('anticipos-table-body', data, ['Fecha Anticipo', 'Folio Anticipo', 'Folio Recepción', 'Folio Cierre', 'Cliente', 'Pieza', 'Cantidad Anticipo'], folioColumns.anticipos);
     }
 
     function initializeVentasTab() {
+        const ventasContent = document.getElementById('ventas-content');
+        ventasContent.innerHTML = `
+            <div class="specific-filter-container">
+                <label class="switch">
+                    <input type="checkbox" id="convenio-filter" checked>
+                    <span class="slider"></span>
+                </label>
+                <label for="convenio-filter">Incluir ventas por Convenio</label>
+            </div>
+            <section class="kpi-grid">
+                <div class="kpi-card"><h4>Total Ventas</h4><p id="total-ventas">...</p></div>
+                <div class="kpi-card"><h4>Total Pagos</h4><p id="total-pagos">...</p></div>
+                <div class="kpi-card"><h4># de Ventas</h4><p id="num-ventas">...</p></div>
+            </section>
+            <section class="charts-grid">
+                <div class="chart-container"><h3>Ventas por Tipo de Servicio</h3><canvas id="ventasServicioChart"></canvas></div>
+                <div class="chart-container"><h3>Resultados de Servicios</h3><canvas id="resultadosChart"></canvas></div>
+            </section>
+            <section class="table-container">
+                <h3>Detalle de Ventas</h3>
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead><tr><th>Fecha Venta</th><th>Folio Venta</th><th>Folio Recepción Final</th><th>Folio Anticipo</th><th>Anticipo en Recepción</th><th>Total Venta</th><th>Total Pagos</th></tr></thead>
+                        <tbody id="ventas-table-body"></tbody>
+                    </table>
+                </div>
+            </section>
+        `;
+        const convenioFilter = document.getElementById('convenio-filter');
+        if(convenioFilter) {
+            convenioFilter.addEventListener('change', masterFilterAndUpdate);
+        }
         charts.ventasServicio = createChart('ventasServicioChart', 'bar');
         charts.resultados = createChart('resultadosChart', 'pie');
     }
+
     function updateVentasTab(data) {
-        const totalVentas = data.reduce((sum, r) => sum + (r['Total Venta'] || 0), 0);
-        document.getElementById('total-ventas').textContent = `$${totalVentas.toLocaleString('es-MX')}`;
-        document.getElementById('total-pagos').textContent = `$${data.reduce((sum, r) => sum + (r['Total Pagos'] || 0), 0).toLocaleString('es-MX')}`;
-        document.getElementById('num-ventas').textContent = data.length;
+        const totalVentasEl = document.getElementById('total-ventas');
+        const totalPagosEl = document.getElementById('total-pagos');
+        const numVentasEl = document.getElementById('num-ventas');
+
+        if(totalVentasEl && totalPagosEl && numVentasEl) {
+            const totalVentas = data.reduce((sum, r) => sum + parseFloat(r['Total Venta'] || 0), 0);
+            const totalPagos = data.reduce((sum, r) => sum + parseFloat(r['Total Pagos'] || 0), 0);
+            totalVentasEl.textContent = `$${totalVentas.toLocaleString('es-MX')}`;
+            totalPagosEl.textContent = `$${totalPagos.toLocaleString('es-MX')}`;
+            numVentasEl.textContent = data.length;
+        }
         updateChartData(charts.ventasServicio, data, 'TipoServicio', 'Total Venta');
         updateChartData(charts.resultados, data, 'Resultado Servicio');
         renderTable('ventas-table-body', data, ['Fecha Venta', 'Folio Venta', 'Folio Recepción Final', 'Folio Anticipo', 'Anticipo en Recepción', 'Total Venta', 'Total Pagos'], folioColumns.ventas);
     }
 
-    // --- LÓGICA DE TRAZABILIDAD ---
     function handleTraceClick(event) {
         const target = event.target;
         if (target.classList.contains('trace-link')) {
@@ -270,7 +317,6 @@ document.addEventListener('DOMContentLoaded', function () {
         masterFilterAndUpdate();
     }
 
-    // --- FUNCIONES UTILITARIAS ---
     function renderTable(bodyId, data, columns, folioConfig) {
         const tableBody = document.getElementById(bodyId);
         if (!tableBody) return;
@@ -294,5 +340,23 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function parseCustomDate(dateString) { if (!dateString || typeof dateString !== 'string') return null; const parts = dateString.split(' ')[0].split('/'); return parts.length === 3 ? new Date(parts[2], parts[1] - 1, parts[0]) : null; }
     function createChart(canvasId, type) { const ctx = document.getElementById(canvasId); if (!ctx) return null; const chartConfig = { type, options: { responsive: true, maintainAspectRatio: false } }; if (type === 'bar') chartConfig.options.indexAxis = 'y'; return new Chart(ctx.getContext('2d'), chartConfig); }
-    function updateChartData(chart, data, categoryCol, sumCol = null) { if (!chart) return; const counts = data.reduce((acc, row) => { const category = row[categoryCol]; if (category) { const value = sumCol ? (row[sumCol] || 0) : 1; acc[category] = (acc[category] || 0) + value; } return acc; }, {}); let sorted = Object.entries(counts).sort(([, a], [, b]) => b - a); chart.data.labels = sorted.map(item => item[0]); chart.data.datasets = [{ data: sorted.map(item => item[1]), backgroundColor: ['#B22222', '#8B1A1A', '#DC3545', '#6c757d', '#1877F2', '#25D366', '#FF9800'] }]; chart.update(); }
+    function updateChartData(chart, data, categoryCol, sumCol = null) {
+        if (!chart) return;
+        const filteredData = data.filter(row => row[categoryCol] && String(row[categoryCol]).trim());
+
+        const counts = filteredData.reduce((acc, row) => {
+            const category = row[categoryCol];
+            const value = sumCol ? (parseFloat(row[sumCol]) || 0) : 1;
+            acc[category] = (acc[category] || 0) + value;
+            return acc;
+        }, {});
+
+        let sorted = Object.entries(counts).sort(([, a], [, b]) => b - a);
+        chart.data.labels = sorted.map(item => item[0]);
+        chart.data.datasets = [{
+            data: sorted.map(item => item[1]),
+            backgroundColor: ['#B22222', '#8B1A1A', '#DC3545', '#6c757d', '#1877F2', '#25D366', '#FF9800']
+        }];
+        chart.update();
+    }
 });
