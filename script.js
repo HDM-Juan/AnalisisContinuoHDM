@@ -11,8 +11,15 @@ document.addEventListener('DOMContentLoaded', function () {
     let originalData = {};
     let charts = {};
     let activeFolioFilter = null;
+    let dataLoaded = false;
 
     // --- ELEMENTOS DEL DOM ---
+    const landingView = document.getElementById('landing-view');
+    const dashboardView = document.getElementById('dashboard-view');
+    const backToLandingButton = document.getElementById('back-to-landing');
+    const sectionLinks = document.querySelectorAll('.section-link');
+    const mainTitle = document.getElementById('main-title');
+
     const validezFilter = document.getElementById('validez-filter');
     const startDateInput = document.getElementById('startDate');
     const endDateInput = document.getElementById('endDate');
@@ -21,7 +28,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const tabContents = document.querySelectorAll('.tab-content');
     const folioFilterStatus = document.getElementById('folio-filter-status');
     
-    // --- MAPEO DE COLUMNAS DE FOLIO PARA TRAZABILIDAD ---
+    // --- MAPEO DE COLUMNAS DE FOLIO ---
     const folioColumns = {
         servicios: { primary: 'Folio Recepción', links: { 'Folio Cierre': 'ventas', 'Folio Anticipo que Dejó': 'anticipos' } },
         compras: { primary: 'Folio Egreso', links: { 'Folio Recepción': 'servicios', 'Folio Anticipo': 'anticipos' } },
@@ -29,53 +36,42 @@ document.addEventListener('DOMContentLoaded', function () {
         ventas: { primary: 'Folio Venta', links: { 'Folio Recepción Final': 'servicios', 'Folio Anticipo': 'anticipos', 'Anticipo en Recepción': 'anticipos' } }
     };
 
+    // --- LÓGICA DE NAVEGACIÓN Y VISTAS ---
+    function showDashboard(tabId = 'ventas') {
+        landingView.style.display = 'none';
+        dashboardView.style.display = 'block';
+        backToLandingButton.style.display = 'inline-block';
+        mainTitle.textContent = 'Dashboard de Análisis de Negocio';
+        switchTab(tabId);
+        if (dataLoaded) {
+            masterFilterAndUpdate();
+        }
+    }
+
+    function showLandingPage() {
+        dashboardView.style.display = 'none';
+        backToLandingButton.style.display = 'none';
+        landingView.style.display = 'block';
+        mainTitle.textContent = 'Análisis de Negocio';
+        activeFolioFilter = null; // Limpiar filtro al volver al inicio
+        window.location.hash = ''; // Limpiar hash de la URL
+    }
+
     // --- LÓGICA PRINCIPAL ---
     function fetchAndCleanData(url, primaryKey) {
         return new Promise((resolve, reject) => {
             Papa.parse(url, {
                 download: true,
-                header: false,
+                header: true,
                 skipEmptyLines: true,
+                transformHeader: h => h.trim(),
                 complete: (results) => {
                     const data = results.data;
-                    if (!data || data.length < 2) {
-                        return resolve([]);
-                    }
-
-                    const headerRow = data[0];
-                    const dataRows = data.slice(1);
-
-                    const primaryKeyIndex = headerRow.findIndex(h => typeof h === 'string' && h.trim() === primaryKey);
-
-                    if (primaryKeyIndex === -1) {
-                         // Fallback for slightly different primary key names
-                        const altPrimaryKey = primaryKey.replace('Ventas', 'Venta');
-                        const altIndex = headerRow.findIndex(h => typeof h === 'string' && h.trim() === altPrimaryKey);
-                        if(altIndex !== -1) {
-                            primaryKeyIndex = altIndex;
-                        } else {
-                            console.error(`Clave primaria "${primaryKey}" no encontrada en ${url}`);
-                            return resolve([]);
-                        }
-                    }
-
-                    const headers = headerRow;
-                    const cleanedData = dataRows.map(row => {
-                        let obj = {};
-                        headers.forEach((header, index) => {
-                            if (header) {
-                                obj[String(header).trim()] = row[index];
-                            }
-                        });
-                        return obj;
-                    }).filter(r => r[primaryKey] || r[primaryKey.replace('Ventas', 'Venta')]);
-
+                    if (!data || data.length === 0) return resolve([]);
+                    const cleanedData = data.filter(r => r[primaryKey] != null && String(r[primaryKey]).trim() !== '');
                     resolve(cleanedData);
                 },
-                error: (error) => {
-                    console.error(`Error al parsear ${url}:`, error);
-                    reject(error);
-                }
+                error: (error) => reject(error)
             });
         });
     }
@@ -94,23 +90,43 @@ document.addEventListener('DOMContentLoaded', function () {
             ventas: ventas.map(r => ({ ...r, fechaVentaObj: parseCustomDate(r['Fecha Venta']) })),
             detalleVenta: detalleVenta
         };
+        dataLoaded = true;
         initializeDashboard();
     }).catch(error => console.error("Error crítico al cargar datos:", error));
 
     function initializeDashboard() {
+        // Listeners del Dashboard
         tabButtons.forEach(button => button.addEventListener('click', () => switchTab(button.dataset.tab)));
         [validezFilter, startDateInput, endDateInput, convenioFilter].forEach(el => el.addEventListener('change', masterFilterAndUpdate));
         folioFilterStatus.addEventListener('click', clearFolioFilter);
-        document.querySelector('.container').addEventListener('click', handleTraceClick);
+        dashboardView.addEventListener('click', handleTraceClick);
 
+        // Listeners de Navegación Principal
+        sectionLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const tabId = new URL(link.href).hash.replace('#', '');
+                showDashboard(tabId);
+            });
+        });
+        backToLandingButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            showLandingPage();
+        });
+
+        // Inicializar Pestañas
         initializeServiciosTab();
         initializeComprasTab();
         initializeAnticiposTab();
         initializeVentasTab();
 
-        const initialTab = window.location.hash.replace('#', '') || 'ventas';
-        switchTab(initialTab);
-        masterFilterAndUpdate();
+        // Decidir vista inicial
+        const initialTab = window.location.hash.replace('#', '');
+        if (initialTab && folioColumns[initialTab]) {
+            showDashboard(initialTab);
+        } else {
+            showLandingPage();
+        }
     }
 
     function switchTab(tabId) {
@@ -119,9 +135,11 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         tabButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabId));
         tabContents.forEach(content => content.classList.toggle('active', content.id === `${tabId}-content`));
+        window.location.hash = tabId;
     }
 
     function masterFilterAndUpdate() {
+        if (!dataLoaded) return;
         const validez = validezFilter.value;
         const filterByValidez = data => data.filter(r => validez === 'todos' || (validez === 'validos' && r.Validez !== 'CANCELADO') || (validez === 'cancelados' && r.Validez === 'CANCELADO'));
         
@@ -140,15 +158,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (activeFolioFilter) {
             const { value } = activeFolioFilter;
-            const folioNumber = String(value).match(/\d+/g)?.join('');
+            const folioNumber = String(value).match(/\d+/g)?.join('') || value;
 
-            const findRelated = (data, folio) => data.filter(r => {
-                return Object.values(r).some(cell => {
+            const findRelated = (data, folio) => data.filter(r =>
+                Object.values(r).some(cell => {
                     if (!cell) return false;
                     const cellFolioNumber = String(cell).match(/\d+/g)?.join('');
-                    return cellFolioNumber && cellFolioNumber === folio;
-                });
-            });
+                    return cellFolioNumber && cellFolioNumber.includes(folio);
+                })
+            );
 
             fServicios = findRelated(fServicios, folioNumber);
             fCompras = findRelated(fCompras, folioNumber);
@@ -167,6 +185,7 @@ document.addEventListener('DOMContentLoaded', function () {
         updateVentasTab(fVentas);
     }
     
+    // --- INICIALIZACIÓN Y ACTUALIZACIÓN DE PESTAÑAS (sin cambios) ---
     function initializeServiciosTab() {
         document.getElementById('servicios-content').innerHTML = `
             <section class="kpi-grid">
@@ -177,7 +196,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 <table class="data-table"><thead><tr><th>Fecha</th><th>Folio Recepción</th><th>Folio Cierre</th><th>Folio Anticipo</th><th>Cliente</th><th>Marca</th><th>Modelo</th><th>Tipo Servicio</th><th>Estado</th></tr></thead>
                 <tbody id="servicios-table-body"></tbody></table></div></section>`;
     }
-
     function updateServiciosTab(data) {
         document.getElementById('total-servicios').textContent = data.length;
         document.getElementById('servicios-exitosos').textContent = data.filter(r => r.Estado === 'ENTREGADO CON EXITO').length;
@@ -194,7 +212,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 <table class="data-table"><thead><tr><th>Fecha</th><th>Folio Egreso</th><th>Folio Recepción</th><th>Folio Anticipo</th><th>Concepto</th><th>Monto</th></tr></thead>
                 <tbody id="egresos-table-body"></tbody></table></div></section>`;
     }
-
     function updateComprasTab(data) {
         const totalEgresos = data.reduce((sum, r) => sum + (r.Monto || 0), 0);
         document.getElementById('total-egresos').textContent = `$${totalEgresos.toLocaleString('es-MX')}`;
@@ -212,7 +229,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 <table class="data-table"><thead><tr><th>Fecha</th><th>Folio Anticipo</th><th>Folio Recepción</th><th>Folio Cierre</th><th>Cliente</th><th>Pieza</th><th>Anticipo</th></tr></thead>
                 <tbody id="anticipos-table-body"></tbody></table></div></section>`;
     }
-
     function updateAnticiposTab(data) {
         const totalAnticipos = data.reduce((sum, r) => sum + (r['Cantidad Anticipo'] || 0), 0);
         document.getElementById('total-anticipos').textContent = `$${totalAnticipos.toLocaleString('es-MX')}`;
@@ -224,7 +240,6 @@ document.addEventListener('DOMContentLoaded', function () {
         charts.ventasServicio = createChart('ventasServicioChart', 'bar');
         charts.resultados = createChart('resultadosChart', 'pie');
     }
-
     function updateVentasTab(data) {
         const totalVentas = data.reduce((sum, r) => sum + (r['Total Venta'] || 0), 0);
         document.getElementById('total-ventas').textContent = `$${totalVentas.toLocaleString('es-MX')}`;
@@ -235,6 +250,7 @@ document.addEventListener('DOMContentLoaded', function () {
         renderTable('ventas-table-body', data, ['Fecha Venta', 'Folio Venta', 'Folio Recepción Final', 'Folio Anticipo', 'Anticipo en Recepción', 'Total Venta', 'Total Pagos'], folioColumns.ventas);
     }
 
+    // --- LÓGICA DE TRAZABILIDAD ---
     function handleTraceClick(event) {
         const target = event.target;
         if (target.classList.contains('trace-link')) {
@@ -245,18 +261,16 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!folio || !tabId) return;
 
             activeFolioFilter = { type: folioType, value: folio };
-            switchTab(tabId);
-            masterFilterAndUpdate();
+            showDashboard(tabId);
         }
     }
 
-    function clearFolioFilter(event) {
-        if (event.target.classList.contains('clear-filter')) {
-            activeFolioFilter = null;
-            masterFilterAndUpdate();
-        }
+    function clearFolioFilter() {
+        activeFolioFilter = null;
+        masterFilterAndUpdate();
     }
 
+    // --- FUNCIONES UTILITARIAS ---
     function renderTable(bodyId, data, columns, folioConfig) {
         const tableBody = document.getElementById(bodyId);
         if (!tableBody) return;
