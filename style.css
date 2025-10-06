@@ -1,24 +1,30 @@
 /* Estilos Generales y de Marca */
 body { font-family: 'Roboto', sans-serif; background-color: #f4f4f4; color: #333; margin: 0; line-height: 1.6; }
-.main-header { background: linear-gradient(135deg, #B22222 0%, #8B1A1A 100%); color: white; padding: 20px 40px; display: flex; align-items: center; gap: 20px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); }
-.header-logo { width: 60px; height: 60px; border-radius: 50%; border: 3px solid #fff; }
-.header-text h1 { margin: 0; font-size: 24px; text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3); }
-.header-text .subtitle { margin: 0; font-weight: 300; opacity: 0.9; }
-.container { max-width: 1200px; margin: 20px auto; padding: 0 20px; }
+.main-header { background: linear-gradient(135deg, #B22222 0%, #8B1A1A 100%); color: white; padding: 15px 30px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); }
+.header-content { display: flex; align-items: center; gap: 20px; }
+.header-logo { width: 50px; height: 50px; border-radius: 50%; border: 2px solid #fff; }
+.header-text h1 { margin: 0; font-size: 22px; text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3); }
+.header-text .subtitle { margin: 0; font-weight: 300; opacity: 0.9; font-size: 0.9em; }
+.back-button { color: white; background-color: rgba(255, 255, 255, 0.2); text-decoration: none; padding: 8px 15px; border-radius: 5px; font-weight: 500; transition: background-color 0.3s; }
+.back-button:hover { background-color: rgba(255, 255, 255, 0.3); }
+.container { max-width: 1300px; margin: 20px auto; padding: 0 20px; }
 .main-footer { background: #333; color: white; text-align: center; padding: 15px; margin-top: 40px; font-size: 0.9em; }
 
 /* Estilos para Pestañas */
-.tab-nav { display: flex; border-bottom: 2px solid #ccc; margin-bottom: 20px; }
+.tab-nav { display: flex; border-bottom: 2px solid #ccc; margin-bottom: 20px; flex-wrap: wrap;}
 .tab-button { padding: 10px 20px; cursor: pointer; border: none; background-color: transparent; font-size: 1.1em; font-weight: 500; color: #666; border-bottom: 3px solid transparent; transition: all 0.3s ease; }
 .tab-button.active { color: #B22222; border-bottom: 3px solid #B22222; }
 .tab-content { display: none; }
-.tab-content.active { display: block; }
+.tab-content.active { display: block; animation: fadeIn 0.5s; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 /* Estilos para Filtros */
-.filters-container { background-color: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); margin-bottom: 30px; display: flex; flex-wrap: wrap; gap: 20px; align-items: center; }
+.filters-container { background-color: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 20px; align-items: center; justify-content: space-between; }
 .filter-group { display: flex; flex-direction: column; }
 .filter-group label { font-size: 0.9em; color: #666; margin-bottom: 5px; }
 .filter-group input[type="date"], .filter-group select { padding: 8px; border: 1px solid #ccc; border-radius: 5px; font-family: 'Roboto', sans-serif; font-size: 1em; }
+.folio-filter-status { background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; padding: 10px 15px; border-radius: 5px; display: flex; align-items: center; gap: 10px; font-weight: 500; }
+.folio-filter-status .clear-filter { color: #B22222; text-decoration: underline; cursor: pointer; font-weight: bold; }
 .specific-filter-container { background-color: #f8f9fa; padding: 10px 15px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
 
 /* Estilos para KPI, Gráficos y Tablas */
@@ -26,15 +32,18 @@ body { font-family: 'Roboto', sans-serif; background-color: #f4f4f4; color: #333
 .kpi-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); text-align: center; }
 .kpi-card h4 { margin: 0 0 10px 0; color: #B22222; }
 .kpi-card p { margin: 0; font-size: 28px; font-weight: 700; color: #333; }
-.charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 30px; }
+.charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 30px; margin-bottom: 30px; }
 .chart-container { background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); height: 400px; display: flex; flex-direction: column; }
 .chart-container h3 { margin-top: 0; text-align: center; color: #8B1A1A; }
 .table-container { background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); overflow-x: auto; }
+.table-container h3 { margin-top: 0; text-align: left; color: #8B1A1A; }
 .data-table { width: 100%; border-collapse: collapse; }
-.data-table th, .data-table td { padding: 10px; border: 1px solid #ddd; text-align: left; font-size: 0.9em; }
+.data-table th, .data-table td { padding: 12px 15px; border: 1px solid #ddd; text-align: left; font-size: 0.9em; white-space: nowrap; }
 .data-table th { background-color: #8B1A1A; color: white; }
-.data-table tbody tr:nth-child(even) { background-color: #f2f2f2; }
-.trace-link { color: #B22222; text-decoration: underline; cursor: pointer; font-weight: bold; }
+.data-table tbody tr:nth-child(even) { background-color: #f9f9f9; }
+.data-table tbody tr:hover { background-color: #f1f1f1; }
+.trace-link { color: #B22222; text-decoration: none; cursor: pointer; font-weight: bold; }
+.trace-link:hover { text-decoration: underline; color: #8B1A1A; }
 
 /* Estilos para el switch de Convenio */
 .switch { position: relative; display: inline-block; width: 50px; height: 24px; }
@@ -45,4 +54,9 @@ input:checked + .slider { background-color: #8B1A1A; }
 input:checked + .slider:before { transform: translateX(26px); }
 
 /* Diseño Responsivo */
-@media (max-width: 768px) { .main-header { flex-direction: column; text-align: center; } }
+@media (max-width: 768px) {
+    .main-header { flex-direction: column; text-align: center; gap: 15px; }
+    .filters-container { flex-direction: column; align-items: stretch; }
+    .charts-grid { grid-template-columns: 1fr; }
+    .data-table th, .data-table td { white-space: normal; }
+}

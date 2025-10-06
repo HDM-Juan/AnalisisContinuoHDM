@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // --- VARIABLES GLOBALES ---
     let originalData = {};
     let charts = {};
+    let activeFolioFilter = null;
 
     // --- ELEMENTOS DEL DOM ---
     const validezFilter = document.getElementById('validez-filter');
@@ -18,22 +19,80 @@ document.addEventListener('DOMContentLoaded', function () {
     const convenioFilter = document.getElementById('convenio-filter');
     const tabButtons = document.querySelectorAll('.tab-button');
     const tabContents = document.querySelectorAll('.tab-content');
+    const folioFilterStatus = document.getElementById('folio-filter-status');
     
+    // --- MAPEO DE COLUMNAS DE FOLIO PARA TRAZABILIDAD ---
+    const folioColumns = {
+        servicios: { primary: 'Folio Recepción', links: { 'Folio Cierre': 'ventas', 'Folio Anticipo que Dejó': 'anticipos' } },
+        compras: { primary: 'Folio Egreso', links: { 'Folio Recepción': 'servicios', 'Folio Anticipo': 'anticipos' } },
+        anticipos: { primary: 'Folio Anticipo', links: { 'Folio Recepción': 'servicios', 'Folio Cierre': 'ventas' } },
+        ventas: { primary: 'Folio Venta', links: { 'Folio Recepción Final': 'servicios', 'Folio Anticipo': 'anticipos', 'Anticipo en Recepción': 'anticipos' } }
+    };
+
     // --- LÓGICA PRINCIPAL ---
-    
-    function fetchData(url) {
-        return new Promise(resolve => Papa.parse(url, { download: true, header: true, dynamicTyping: true, transformHeader: h => h.trim(), complete: res => resolve(res.data) }));
+    function fetchAndCleanData(url, primaryKey) {
+        return new Promise((resolve, reject) => {
+            Papa.parse(url, {
+                download: true,
+                header: false,
+                skipEmptyLines: true,
+                complete: (results) => {
+                    const data = results.data;
+                    if (!data || data.length < 2) {
+                        return resolve([]);
+                    }
+
+                    const headerRow = data[0];
+                    const dataRows = data.slice(1);
+
+                    const primaryKeyIndex = headerRow.findIndex(h => typeof h === 'string' && h.trim() === primaryKey);
+
+                    if (primaryKeyIndex === -1) {
+                         // Fallback for slightly different primary key names
+                        const altPrimaryKey = primaryKey.replace('Ventas', 'Venta');
+                        const altIndex = headerRow.findIndex(h => typeof h === 'string' && h.trim() === altPrimaryKey);
+                        if(altIndex !== -1) {
+                            primaryKeyIndex = altIndex;
+                        } else {
+                            console.error(`Clave primaria "${primaryKey}" no encontrada en ${url}`);
+                            return resolve([]);
+                        }
+                    }
+
+                    const headers = headerRow;
+                    const cleanedData = dataRows.map(row => {
+                        let obj = {};
+                        headers.forEach((header, index) => {
+                            if (header) {
+                                obj[String(header).trim()] = row[index];
+                            }
+                        });
+                        return obj;
+                    }).filter(r => r[primaryKey] || r[primaryKey.replace('Ventas', 'Venta')]);
+
+                    resolve(cleanedData);
+                },
+                error: (error) => {
+                    console.error(`Error al parsear ${url}:`, error);
+                    reject(error);
+                }
+            });
+        });
     }
 
     Promise.all([
-        fetchData(serviciosUrl), fetchData(egresosUrl), fetchData(anticiposUrl), fetchData(ventasUrl), fetchData(detalleVentaUrl)
-    ]).then(([servicios, egresos, anticipos, ventas, detalleVenta]) => {
+        fetchAndCleanData(serviciosUrl, 'Folio Recepción'),
+        fetchAndCleanData(egresosUrl, 'Folio Egreso'),
+        fetchAndCleanData(anticiposUrl, 'Folio Anticipo'),
+        fetchAndCleanData(ventasUrl, 'Folio Venta'),
+        fetchAndCleanData(detalleVentaUrl, 'Folio Venta')
+    ]).then(([servicios, compras, anticipos, ventas, detalleVenta]) => {
         originalData = {
-            servicios: servicios.filter(r => r['Folio Recepción']).map(r => ({ ...r, fechaRecepcionObj: parseCustomDate(r['Fecha Recepción']) })),
-            egresos: egresos.filter(r => r['Folio Egreso']).map(r => ({ ...r, fechaCompraObj: parseCustomDate(r['Fecha y Hora Compra']) })),
-            anticipos: anticipos.filter(r => r['Folio Anticipo']).map(r => ({ ...r, fechaAnticipoObj: parseCustomDate(r['Fecha Anticipo']) })),
-            ventas: ventas.filter(r => r['Folio Ventas']).map(r => ({ ...r, fechaVentaObj: parseCustomDate(r['Fecha Ventas']), FolioRecepcion: r['Folio Recepción Final'] })),
-            detalleVenta: detalleVenta.filter(r => r['Folio Venta'])
+            servicios: servicios.map(r => ({ ...r, fechaRecepcionObj: parseCustomDate(r['Fecha Recepción']) })),
+            compras: compras.map(r => ({ ...r, fechaCompraObj: parseCustomDate(r['Fecha y Hora Compra']) })),
+            anticipos: anticipos.map(r => ({ ...r, fechaAnticipoObj: parseCustomDate(r['Fecha Anticipo']) })),
+            ventas: ventas.map(r => ({ ...r, fechaVentaObj: parseCustomDate(r['Fecha Venta']) })),
+            detalleVenta: detalleVenta
         };
         initializeDashboard();
     }).catch(error => console.error("Error crítico al cargar datos:", error));
@@ -41,16 +100,23 @@ document.addEventListener('DOMContentLoaded', function () {
     function initializeDashboard() {
         tabButtons.forEach(button => button.addEventListener('click', () => switchTab(button.dataset.tab)));
         [validezFilter, startDateInput, endDateInput, convenioFilter].forEach(el => el.addEventListener('change', masterFilterAndUpdate));
-        
+        folioFilterStatus.addEventListener('click', clearFolioFilter);
+        document.querySelector('.container').addEventListener('click', handleTraceClick);
+
         initializeServiciosTab();
         initializeComprasTab();
         initializeAnticiposTab();
         initializeVentasTab();
 
+        const initialTab = window.location.hash.replace('#', '') || 'ventas';
+        switchTab(initialTab);
         masterFilterAndUpdate();
     }
 
     function switchTab(tabId) {
+        if (!document.getElementById(`${tabId}-content`)) {
+            tabId = 'ventas';
+        }
         tabButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabId));
         tabContents.forEach(content => content.classList.toggle('active', content.id === `${tabId}-content`));
     }
@@ -63,149 +129,156 @@ document.addEventListener('DOMContentLoaded', function () {
         const endDate = endDateInput.valueAsDate;
         const filterByDate = (data, dateCol) => !startDate || !endDate ? data : data.filter(r => r[dateCol] >= startDate && r[dateCol] <= endDate);
 
-        const fServicios = filterByDate(filterByValidez(originalData.servicios), 'fechaRecepcionObj');
-        const fEgresos = filterByDate(filterByValidez(originalData.egresos), 'fechaCompraObj');
-        const fAnticipos = filterByDate(filterByValidez(originalData.anticipos), 'fechaAnticipoObj');
+        let fServicios = filterByDate(filterByValidez(originalData.servicios), 'fechaRecepcionObj');
+        let fCompras = filterByDate(filterByValidez(originalData.compras), 'fechaCompraObj');
+        let fAnticipos = filterByDate(filterByValidez(originalData.anticipos), 'fechaAnticipoObj');
         let fVentas = filterByDate(filterByValidez(originalData.ventas), 'fechaVentaObj');
         
-        if (!convenioFilter.checked) {
+        if (convenioFilter && !convenioFilter.checked) {
             fVentas = fVentas.filter(r => r['¿Convenio?'] !== true);
         }
 
+        if (activeFolioFilter) {
+            const { value } = activeFolioFilter;
+            const folioNumber = String(value).match(/\d+/g)?.join('');
+
+            const findRelated = (data, folio) => data.filter(r => {
+                return Object.values(r).some(cell => {
+                    if (!cell) return false;
+                    const cellFolioNumber = String(cell).match(/\d+/g)?.join('');
+                    return cellFolioNumber && cellFolioNumber === folio;
+                });
+            });
+
+            fServicios = findRelated(fServicios, folioNumber);
+            fCompras = findRelated(fCompras, folioNumber);
+            fAnticipos = findRelated(fAnticipos, folioNumber);
+            fVentas = findRelated(fVentas, folioNumber);
+
+            folioFilterStatus.innerHTML = `Filtrando por Folio: <strong>${value}</strong> <span class="clear-filter">(quitar)</span>`;
+            folioFilterStatus.style.display = 'flex';
+        } else {
+            folioFilterStatus.style.display = 'none';
+        }
+
         updateServiciosTab(fServicios);
-        updateComprasTab(fEgresos);
+        updateComprasTab(fCompras);
         updateAnticiposTab(fAnticipos);
         updateVentasTab(fVentas);
     }
     
-    // --- PESTAÑA "SERVICIOS" (CÓDIGO RESTAURADO) ---
     function initializeServiciosTab() {
         document.getElementById('servicios-content').innerHTML = `
             <section class="kpi-grid">
                 <div class="kpi-card"><h4>Total Servicios</h4><p id="total-servicios">...</p></div>
+                <div class="kpi-card"><h4>Servicios Exitosos</h4><p id="servicios-exitosos">...</p></div>
             </section>
-            <section class="charts-grid">
-                <div class="chart-container"><h3>Servicios por Tipo</h3><canvas id="serviciosChart"></canvas></div>
-                <div class="chart-container"><h3>Equipos por Marca</h3><canvas id="marcasChart"></canvas></div>
-            </section>`;
-        charts.servicios = createChart('serviciosChart', 'bar');
-        charts.marcas = createChart('marcasChart', 'doughnut');
-    }
-    function updateServiciosTab(data) {
-        document.getElementById('total-servicios').textContent = data.length;
-        updateChartData(charts.servicios, data, 'TipoServicio');
-        updateChartData(charts.marcas, data, 'Marca');
+            <section class="table-container"><h3>Detalle de Servicios</h3><div class="table-wrapper">
+                <table class="data-table"><thead><tr><th>Fecha</th><th>Folio Recepción</th><th>Folio Cierre</th><th>Folio Anticipo</th><th>Cliente</th><th>Marca</th><th>Modelo</th><th>Tipo Servicio</th><th>Estado</th></tr></thead>
+                <tbody id="servicios-table-body"></tbody></table></div></section>`;
     }
 
-    // --- PESTAÑA "COMPRAS" (CÓDIGO RESTAURADO) ---
+    function updateServiciosTab(data) {
+        document.getElementById('total-servicios').textContent = data.length;
+        document.getElementById('servicios-exitosos').textContent = data.filter(r => r.Estado === 'ENTREGADO CON EXITO').length;
+        renderTable('servicios-table-body', data, ['Fecha Recepción', 'Folio Recepción', 'Folio Cierre', 'Folio Anticipo que Dejó', 'Cliente', 'Marca', 'Modelo', 'TipoServicio', 'Estado'], folioColumns.servicios);
+    }
+
     function initializeComprasTab() {
         document.getElementById('compras-content').innerHTML = `
             <section class="kpi-grid">
                 <div class="kpi-card"><h4>Total Egresos</h4><p id="total-egresos">...</p></div>
                 <div class="kpi-card"><h4># de Compras</h4><p id="num-compras">...</p></div>
             </section>
-            <section class="charts-grid">
-                <div class="chart-container"><h3>Egresos por Tipo</h3><canvas id="egresosTipoChart"></canvas></div>
-            </section>
             <section class="table-container"><h3>Detalle de Egresos</h3><div class="table-wrapper">
-                <table class="data-table"><thead><tr><th>Fecha</th><th>Tipo</th><th>Concepto/Artículo</th><th>Monto</th></tr></thead><tbody id="egresos-table-body"></tbody></table>
-            </div></section>`;
-        charts.egresosTipo = createChart('egresosTipoChart', 'pie');
-    }
-    function updateComprasTab(data) {
-        const totalEgresos = data.reduce((sum, r) => sum + (r.Monto || 0), 0);
-        document.getElementById('total-egresos').textContent = `$${totalEgresos.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`;
-        document.getElementById('num-compras').textContent = data.length;
-        updateChartData(charts.egresosTipo, data, 'Tipo', 'Monto');
-        const tableBody = document.getElementById('egresos-table-body');
-        tableBody.innerHTML = '';
-        data.slice(0, 100).forEach(r => {
-            tableBody.innerHTML += `<tr><td>${r['Fecha y Hora Compra'] || ''}</td><td>${r.Tipo || ''}</td><td>${r['Artículo a Comprar'] || r.Concepto || ''}</td><td>$${(r.Monto || 0).toFixed(2)}</td></tr>`;
-        });
+                <table class="data-table"><thead><tr><th>Fecha</th><th>Folio Egreso</th><th>Folio Recepción</th><th>Folio Anticipo</th><th>Concepto</th><th>Monto</th></tr></thead>
+                <tbody id="egresos-table-body"></tbody></table></div></section>`;
     }
 
-    // --- PESTAÑA "ANTICIPOS" (CÓDIGO RESTAURADO) ---
+    function updateComprasTab(data) {
+        const totalEgresos = data.reduce((sum, r) => sum + (r.Monto || 0), 0);
+        document.getElementById('total-egresos').textContent = `$${totalEgresos.toLocaleString('es-MX')}`;
+        document.getElementById('num-compras').textContent = data.length;
+        renderTable('egresos-table-body', data, ['Fecha y Hora Compra', 'Folio Egreso', 'Folio Recepción', 'Folio Anticipo', 'Concepto', 'Monto'], folioColumns.compras);
+    }
+
     function initializeAnticiposTab() {
         document.getElementById('anticipos-content').innerHTML = `
             <section class="kpi-grid">
                 <div class="kpi-card"><h4>Anticipos Recibidos</h4><p id="total-anticipos">...</p></div>
-                <div class="kpi-card"><h4>Costo Total Piezas</h4><p id="costo-piezas">...</p></div>
                 <div class="kpi-card"><h4># Piezas Pedidas</h4><p id="num-piezas">...</p></div>
             </section>
-            <section class="table-container"><h3>Detalle de Anticipos</h3><div class="table-wrapper"><table class="data-table">
-            <thead><tr><th>Fecha</th><th>Folio</th><th>Modelo</th><th>Pieza</th><th>Costo</th><th>Anticipo</th><th>Llegada Est.</th></tr></thead>
-            <tbody id="anticipos-table-body"></tbody></table></div>`;
-    }
-    function updateAnticiposTab(data) {
-        const totalAnticipos = data.reduce((sum, r) => sum + (r['Cantidad Anticipo'] || 0), 0);
-        const costoPiezas = data.reduce((sum, r) => sum + (r.Costo || 0), 0);
-        document.getElementById('total-anticipos').textContent = `$${totalAnticipos.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`;
-        document.getElementById('costo-piezas').textContent = `$${costoPiezas.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`;
-        document.getElementById('num-piezas').textContent = data.length;
-        const tableBody = document.getElementById('anticipos-table-body');
-        tableBody.innerHTML = '';
-        data.slice(0, 100).forEach(r => {
-            tableBody.innerHTML += `<tr>
-                <td>${r['Fecha Anticipo'] || ''}</td><td>${r['Folio Anticipo'] || ''}</td>
-                <td>${r.Modelo_Ver || ''}</td><td>${r.Pieza || ''}</td>
-                <td>$${(r.Costo || 0).toFixed(2)}</td><td>$${(r['Cantidad Anticipo'] || 0).toFixed(2)}</td>
-                <td>${r['Fecha estimada Arribo'] || ''}</td>
-            </tr>`;
-        });
+            <section class="table-container"><h3>Detalle de Anticipos</h3><div class="table-wrapper">
+                <table class="data-table"><thead><tr><th>Fecha</th><th>Folio Anticipo</th><th>Folio Recepción</th><th>Folio Cierre</th><th>Cliente</th><th>Pieza</th><th>Anticipo</th></tr></thead>
+                <tbody id="anticipos-table-body"></tbody></table></div></section>`;
     }
 
-    // --- PESTAÑA "VENTAS" (CÓDIGO NUEVO) ---
+    function updateAnticiposTab(data) {
+        const totalAnticipos = data.reduce((sum, r) => sum + (r['Cantidad Anticipo'] || 0), 0);
+        document.getElementById('total-anticipos').textContent = `$${totalAnticipos.toLocaleString('es-MX')}`;
+        document.getElementById('num-piezas').textContent = data.length;
+        renderTable('anticipos-table-body', data, ['Fecha Anticipo', 'Folio Anticipo', 'Folio Recepción', 'Folio Cierre', 'Cliente', 'Pieza', 'Cantidad Anticipo'], folioColumns.anticipos);
+    }
+
     function initializeVentasTab() {
-        const container = document.getElementById('ventas-content');
-        container.querySelector('#ventas-kpi-container').innerHTML = `
-            <div class="kpi-card"><h4>Ingresos Totales</h4><p id="total-ventas">...</p></div>
-            <div class="kpi-card"><h4>Pagos Recibidos</h4><p id="total-pagos">...</p></div>
-            <div class="kpi-card"><h4># de Ventas</h4><p id="num-ventas">...</p></div>`;
-        container.querySelector('#ventas-charts-grid').innerHTML = `
-            <div class="chart-container"><h3>Ventas por Tipo de Servicio</h3><canvas id="ventasServicioChart"></canvas></div>
-            <div class="chart-container"><h3>Resultados de Servicio</h3><canvas id="resultadosChart"></canvas></div>`;
-        container.querySelector('#ventas-table-container').innerHTML = `
-            <h3>Detalle de Ventas</h3><div class="table-wrapper"><table class="data-table">
-            <thead><tr><th>Fecha</th><th>Folio Venta</th><th>Folio Recepción</th><th>Folio Anticipo</th><th>Total Venta</th><th>Total Pagos</th></tr></thead>
-            <tbody id="ventas-table-body"></tbody></table></div>`;
-        
         charts.ventasServicio = createChart('ventasServicioChart', 'bar');
         charts.resultados = createChart('resultadosChart', 'pie');
-        container.querySelector('#ventas-table-body').addEventListener('click', handleTraceClick);
     }
+
     function updateVentasTab(data) {
         const totalVentas = data.reduce((sum, r) => sum + (r['Total Venta'] || 0), 0);
-        const totalPagos = data.reduce((sum, r) => sum + (r['Total Pagos'] || 0), 0);
-        document.getElementById('total-ventas').textContent = `$${totalVentas.toLocaleString('es-MX', {minimumFractionDigits: 2})}`;
-        document.getElementById('total-pagos').textContent = `$${totalPagos.toLocaleString('es-MX', {minimumFractionDigits: 2})}`;
+        document.getElementById('total-ventas').textContent = `$${totalVentas.toLocaleString('es-MX')}`;
+        document.getElementById('total-pagos').textContent = `$${data.reduce((sum, r) => sum + (r['Total Pagos'] || 0), 0).toLocaleString('es-MX')}`;
         document.getElementById('num-ventas').textContent = data.length;
         updateChartData(charts.ventasServicio, data, 'TipoServicio', 'Total Venta');
         updateChartData(charts.resultados, data, 'Resultado Servicio');
-        const tableBody = document.getElementById('ventas-table-body');
-        tableBody.innerHTML = '';
-        data.slice(0, 100).forEach(r => {
-            const folioRecepcionHTML = r.FolioRecepcion ? `<span class="trace-link" data-folio="${r.FolioRecepcion}" data-target-tab="servicios">${r.FolioRecepcion}</span>` : '';
-            const folioAnticipoHTML = r['Folio Anticipo'] ? `<span class="trace-link" data-folio="${r['Folio Anticipo']}" data-target-tab="anticipos">${r['Folio Anticipo']}</span>` : '';
-            tableBody.innerHTML += `<tr>
-                <td>${r['Fecha Ventas'] || ''}</td><td>${r['Folio Ventas']}</td>
-                <td>${folioRecepcionHTML}</td><td>${folioAnticipoHTML}</td>
-                <td>$${(r['Total Venta'] || 0).toFixed(2)}</td><td>$${(r['Total Pagos'] || 0).toFixed(2)}</td>
-            </tr>`;
-        });
+        renderTable('ventas-table-body', data, ['Fecha Venta', 'Folio Venta', 'Folio Recepción Final', 'Folio Anticipo', 'Anticipo en Recepción', 'Total Venta', 'Total Pagos'], folioColumns.ventas);
     }
 
-    // --- LÓGICA DE TRAZABILIDAD ---
     function handleTraceClick(event) {
-        if (event.target.classList.contains('trace-link')) {
-            const folio = event.target.dataset.folio;
-            const tabId = event.target.dataset.targetTab;
-            alert(`Trazabilidad: Buscando Folio ${folio} en la pestaña ${tabId}. \n(La funcionalidad de auto-filtrado se implementará en el siguiente paso)`);
+        const target = event.target;
+        if (target.classList.contains('trace-link')) {
+            const folio = target.dataset.folio;
+            const tabId = target.dataset.targetTab;
+            const folioType = target.dataset.folioType;
+
+            if (!folio || !tabId) return;
+
+            activeFolioFilter = { type: folioType, value: folio };
             switchTab(tabId);
+            masterFilterAndUpdate();
         }
     }
 
-    // --- FUNCIONES UTILITARIAS ---
+    function clearFolioFilter(event) {
+        if (event.target.classList.contains('clear-filter')) {
+            activeFolioFilter = null;
+            masterFilterAndUpdate();
+        }
+    }
+
+    function renderTable(bodyId, data, columns, folioConfig) {
+        const tableBody = document.getElementById(bodyId);
+        if (!tableBody) return;
+        tableBody.innerHTML = '';
+        data.slice(0, 150).forEach(row => {
+            const cells = columns.map(col => {
+                const value = row[col] || '';
+                let cellHTML = `<td>${value}</td>`;
+                if (folioConfig && value) {
+                    if (folioConfig.links[col]) {
+                        cellHTML = `<td><span class="trace-link" data-folio="${value}" data-target-tab="${folioConfig.links[col]}" data-folio-type="${col}">${value}</span></td>`;
+                    } else if (folioConfig.primary === col) {
+                         cellHTML = `<td><strong>${value}</strong></td>`;
+                    }
+                }
+                return cellHTML;
+            });
+            tableBody.innerHTML += `<tr>${cells.join('')}</tr>`;
+        });
+    }
+
     function parseCustomDate(dateString) { if (!dateString || typeof dateString !== 'string') return null; const parts = dateString.split(' ')[0].split('/'); return parts.length === 3 ? new Date(parts[2], parts[1] - 1, parts[0]) : null; }
-    function createChart(canvasId, type) { const ctx = document.getElementById(canvasId).getContext('2d'); const chartConfig = { type, options: { responsive: true, maintainAspectRatio: false } }; if (type === 'bar') chartConfig.options.indexAxis = 'y'; return new Chart(ctx, chartConfig); }
-    function updateChartData(chart, data, categoryCol, sumCol = null) { const counts = data.reduce((acc, row) => { const category = row[categoryCol]; if (category) { const value = sumCol ? (row[sumCol] || 0) : 1; acc[category] = (acc[category] || 0) + value; } return acc; }, {}); let sorted = Object.entries(counts).sort(([, a], [, b]) => b - a); chart.data.labels = sorted.map(item => item[0]); chart.data.datasets = [{ data: sorted.map(item => item[1]), backgroundColor: ['#B22222', '#8B1A1A', '#DC3545', '#6c757d', '#1877F2', '#25D366', '#FF9800'] }]; chart.update(); }
+    function createChart(canvasId, type) { const ctx = document.getElementById(canvasId); if (!ctx) return null; const chartConfig = { type, options: { responsive: true, maintainAspectRatio: false } }; if (type === 'bar') chartConfig.options.indexAxis = 'y'; return new Chart(ctx.getContext('2d'), chartConfig); }
+    function updateChartData(chart, data, categoryCol, sumCol = null) { if (!chart) return; const counts = data.reduce((acc, row) => { const category = row[categoryCol]; if (category) { const value = sumCol ? (row[sumCol] || 0) : 1; acc[category] = (acc[category] || 0) + value; } return acc; }, {}); let sorted = Object.entries(counts).sort(([, a], [, b]) => b - a); chart.data.labels = sorted.map(item => item[0]); chart.data.datasets = [{ data: sorted.map(item => item[1]), backgroundColor: ['#B22222', '#8B1A1A', '#DC3545', '#6c757d', '#1877F2', '#25D366', '#FF9800'] }]; chart.update(); }
 });
