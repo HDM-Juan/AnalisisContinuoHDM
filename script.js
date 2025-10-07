@@ -110,32 +110,35 @@ document.addEventListener('DOMContentLoaded', function () {
         folioFilterStatus.addEventListener('click', clearFolioFilter);
         dashboardView.addEventListener('click', handleTraceClick);
 
-        // Listeners de Navegación Principal
-        sectionLinks.forEach(link => {
-            link.addEventListener('click', (e) => {
-                e.preventDefault();
-                const tabId = new URL(link.href).hash.replace('#', '');
-                showDashboard(tabId);
-            });
-        });
-        backToLandingButton.addEventListener('click', (e) => {
-            e.preventDefault();
-            showLandingPage();
-        });
-
         // Inicializar Pestañas
         initializeServiciosTab();
         initializeComprasTab();
         initializeAnticiposTab();
         initializeVentasTab();
 
-        // Decidir vista inicial
-        const initialTab = window.location.hash.replace('#', '');
-        if (initialTab && folioColumns[initialTab]) {
-            showDashboard(initialTab);
-        } else {
-            showLandingPage();
-        }
+        // Forzar actualización de datos ahora que todo está listo
+        masterFilterAndUpdate();
+    }
+
+    // Listeners de Navegación Principal (se ejecutan inmediatamente)
+    sectionLinks.forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            const tabId = link.hash.replace('#', '');
+            showDashboard(tabId);
+        });
+    });
+    backToLandingButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        showLandingPage();
+    });
+
+    // Decidir vista inicial (se ejecuta inmediatamente)
+    const initialTab = window.location.hash.replace('#', '');
+    if (initialTab && folioColumns[initialTab]) {
+        showDashboard(initialTab);
+    } else {
+        showLandingPage();
     }
 
     function switchTab(tabId) {
