@@ -1,17 +1,24 @@
 document.addEventListener('DOMContentLoaded', function () {
     // --- URLs DE DATOS ---
+    const toProxyUrl = (originalUrl) => `/api/data?url=${encodeURIComponent(originalUrl)}`;
     const gid_base = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRxKT2sTncuJZP4_Bov1Gw1j7ixqNTfW7yGNn8nmAz8gDPauVeBt-8zqCEZWABXI0-BBDEQ4eTvZZkV/pub?single=true&output=csv';
-    const serviciosUrl = `${gid_base}&gid=748915905`;
-    const egresosUrl = `${gid_base}&gid=1961448383`;
-    const anticiposUrl = `${gid_base}&gid=46329458`;
-    const ventasUrl = `${gid_base}&gid=681275414`;
-    const detalleVentaUrl = `${gid_base}&gid=553669204`;
+
+    const serviciosUrl = toProxyUrl(`${gid_base}&gid=748915905`);
+    const egresosUrl = toProxyUrl(`${gid_base}&gid=1961448383`);
+    const anticiposUrl = toProxyUrl(`${gid_base}&gid=46329458`);
+    const ventasUrl = toProxyUrl(`${gid_base}&gid=681275414`);
+    const detalleVentaUrl = toProxyUrl(`${gid_base}&gid=553669204`);
 
     // --- VARIABLES GLOBALES ---
-    let originalData = {};
+    let originalData = {
+        servicios: [],
+        compras: [],
+        anticipos: [],
+        ventas: [],
+        detalleVenta: []
+    };
     let charts = {};
     let activeFolioFilter = null;
-    let dataLoaded = false;
 
     // --- ELEMENTOS DEL DOM ---
     const landingView = document.getElementById('landing-view');
@@ -43,9 +50,7 @@ document.addEventListener('DOMContentLoaded', function () {
         backToLandingButton.style.display = 'inline-block';
         mainTitle.textContent = 'Dashboard de Análisis de Negocio';
         switchTab(tabId);
-        if (dataLoaded) {
-            masterFilterAndUpdate();
-        }
+        masterFilterAndUpdate();
     }
 
     function showLandingPage() {
@@ -83,36 +88,14 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    Promise.all([
-        fetchAndCleanData(serviciosUrl, 'Folio Recepción'),
-        fetchAndCleanData(egresosUrl, 'Folio Egreso'),
-        fetchAndCleanData(anticiposUrl, 'Folio Anticipo'),
-        fetchAndCleanData(ventasUrl, 'Folio Venta'),
-        fetchAndCleanData(detalleVentaUrl, 'Folio Venta')
-    ]).then(([servicios, compras, anticipos, ventas, detalleVenta]) => {
-        originalData = {
-            servicios: servicios.map(r => ({ ...r, fechaRecepcionObj: parseCustomDate(r['Fecha Recepción']) })),
-            compras: compras.map(r => ({ ...r, fechaCompraObj: parseCustomDate(r['Fecha y Hora Compra']) })),
-            anticipos: anticipos.map(r => ({ ...r, fechaAnticipoObj: parseCustomDate(r['Fecha Anticipo']) })),
-            ventas: ventas.map(r => ({ ...r, fechaVentaObj: parseCustomDate(r['Fecha Venta']) })),
-            detalleVenta: detalleVenta
-        };
-        dataLoaded = true;
-        initializeDashboard();
-    }).catch(error => console.error("Error crítico al cargar datos:", error));
-
-    function initializeDashboard() {
-        // Listeners del Dashboard
-        tabButtons.forEach(button => button.addEventListener('click', () => switchTab(button.dataset.tab)));
-        applyFiltersButton.addEventListener('click', masterFilterAndUpdate);
-        folioFilterStatus.addEventListener('click', clearFolioFilter);
-        dashboardView.addEventListener('click', handleTraceClick);
-
+    // --- INICIALIZACIÓN DE LA UI ---
+    // Se configura la UI y los listeners de inmediato
+    function initializeUI() {
         // Listeners de Navegación Principal
         sectionLinks.forEach(link => {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
-                const tabId = new URL(link.href).hash.replace('#', '');
+                const tabId = link.hash.replace('#', '');
                 showDashboard(tabId);
             });
         });
@@ -121,7 +104,13 @@ document.addEventListener('DOMContentLoaded', function () {
             showLandingPage();
         });
 
-        // Inicializar Pestañas
+        // Listeners del Dashboard
+        tabButtons.forEach(button => button.addEventListener('click', () => switchTab(button.dataset.tab)));
+        applyFiltersButton.addEventListener('click', masterFilterAndUpdate);
+        folioFilterStatus.addEventListener('click', clearFolioFilter);
+        dashboardView.addEventListener('click', handleTraceClick);
+
+        // Inicializar la estructura de las Pestañas
         initializeServiciosTab();
         initializeComprasTab();
         initializeAnticiposTab();
@@ -136,6 +125,34 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    // --- CARGA DE DATOS ---
+    // Se cargan los datos en segundo plano y se actualiza la UI cuando estén listos
+    function loadData() {
+        Promise.all([
+            fetchAndCleanData(serviciosUrl, 'Folio Recepción'),
+            fetchAndCleanData(egresosUrl, 'Folio Egreso'),
+            fetchAndCleanData(anticiposUrl, 'Folio Anticipo'),
+            fetchAndCleanData(ventasUrl, 'Folio Venta'),
+            fetchAndCleanData(detalleVentaUrl, 'Folio Venta')
+        ]).then(([servicios, compras, anticipos, ventas, detalleVenta]) => {
+            originalData = {
+                servicios: servicios.map(r => ({ ...r, fechaRecepcionObj: parseCustomDate(r['Fecha Recepción']) })),
+                compras: compras.map(r => ({ ...r, fechaCompraObj: parseCustomDate(r['Fecha y Hora Compra']) })),
+                anticipos: anticipos.map(r => ({ ...r, fechaAnticipoObj: parseCustomDate(r['Fecha Anticipo']) })),
+                ventas: ventas.map(r => ({ ...r, fechaVentaObj: parseCustomDate(r['Fecha Venta']) })),
+                detalleVenta: detalleVenta
+            };
+            // Una vez cargados los datos, se actualizan las vistas que lo necesiten
+            masterFilterAndUpdate();
+        }).catch(error => {
+            console.error("Error crítico al cargar datos:", error);
+            // Opcional: Mostrar un mensaje de error en la UI
+        });
+    }
+
+    initializeUI();
+    loadData();
+
     function switchTab(tabId) {
         if (!document.getElementById(`${tabId}-content`)) {
             tabId = 'ventas';
@@ -147,7 +164,6 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function masterFilterAndUpdate() {
-        if (!dataLoaded) return;
         const validez = validezFilter.value;
         const filterByValidez = data => data.filter(r => validez === 'todos' || (validez === 'validos' && r.Validez !== 'CANCELADO') || (validez === 'cancelados' && r.Validez === 'CANCELADO'));
         
