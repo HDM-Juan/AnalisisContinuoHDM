@@ -10,10 +10,15 @@ document.addEventListener('DOMContentLoaded', function () {
     const detalleVentaUrl = toProxyUrl(`${gid_base}&gid=553669204`);
 
     // --- VARIABLES GLOBALES ---
-    let originalData = {};
+    let originalData = {
+        servicios: [],
+        compras: [],
+        anticipos: [],
+        ventas: [],
+        detalleVenta: []
+    };
     let charts = {};
     let activeFolioFilter = null;
-    let dataLoaded = false;
 
     // --- ELEMENTOS DEL DOM ---
     const landingView = document.getElementById('landing-view');
@@ -45,9 +50,7 @@ document.addEventListener('DOMContentLoaded', function () {
         backToLandingButton.style.display = 'inline-block';
         mainTitle.textContent = 'Dashboard de Análisis de Negocio';
         switchTab(tabId);
-        if (dataLoaded) {
-            masterFilterAndUpdate();
-        }
+        masterFilterAndUpdate();
     }
 
     function showLandingPage() {
@@ -85,61 +88,70 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    Promise.all([
-        fetchAndCleanData(serviciosUrl, 'Folio Recepción'),
-        fetchAndCleanData(egresosUrl, 'Folio Egreso'),
-        fetchAndCleanData(anticiposUrl, 'Folio Anticipo'),
-        fetchAndCleanData(ventasUrl, 'Folio Venta'),
-        fetchAndCleanData(detalleVentaUrl, 'Folio Venta')
-    ]).then(([servicios, compras, anticipos, ventas, detalleVenta]) => {
-        originalData = {
-            servicios: servicios.map(r => ({ ...r, fechaRecepcionObj: parseCustomDate(r['Fecha Recepción']) })),
-            compras: compras.map(r => ({ ...r, fechaCompraObj: parseCustomDate(r['Fecha y Hora Compra']) })),
-            anticipos: anticipos.map(r => ({ ...r, fechaAnticipoObj: parseCustomDate(r['Fecha Anticipo']) })),
-            ventas: ventas.map(r => ({ ...r, fechaVentaObj: parseCustomDate(r['Fecha Venta']) })),
-            detalleVenta: detalleVenta
-        };
-        dataLoaded = true;
-        initializeDashboard();
-    }).catch(error => console.error("Error crítico al cargar datos:", error));
+    // --- INICIALIZACIÓN DE LA UI ---
+    // Se configura la UI y los listeners de inmediato
+    function initializeUI() {
+        // Listeners de Navegación Principal
+        sectionLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const tabId = link.hash.replace('#', '');
+                showDashboard(tabId);
+            });
+        });
+        backToLandingButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            showLandingPage();
+        });
 
-    function initializeDashboard() {
         // Listeners del Dashboard
         tabButtons.forEach(button => button.addEventListener('click', () => switchTab(button.dataset.tab)));
         applyFiltersButton.addEventListener('click', masterFilterAndUpdate);
         folioFilterStatus.addEventListener('click', clearFolioFilter);
         dashboardView.addEventListener('click', handleTraceClick);
 
-        // Inicializar Pestañas
+        // Inicializar la estructura de las Pestañas
         initializeServiciosTab();
         initializeComprasTab();
         initializeAnticiposTab();
         initializeVentasTab();
 
-        // Forzar actualización de datos ahora que todo está listo
-        masterFilterAndUpdate();
+        // Decidir vista inicial
+        const initialTab = window.location.hash.replace('#', '');
+        if (initialTab && folioColumns[initialTab]) {
+            showDashboard(initialTab);
+        } else {
+            showLandingPage();
+        }
     }
 
-    // Listeners de Navegación Principal (se ejecutan inmediatamente)
-    sectionLinks.forEach(link => {
-        link.addEventListener('click', (e) => {
-            e.preventDefault();
-            const tabId = link.hash.replace('#', '');
-            showDashboard(tabId);
+    // --- CARGA DE DATOS ---
+    // Se cargan los datos en segundo plano y se actualiza la UI cuando estén listos
+    function loadData() {
+        Promise.all([
+            fetchAndCleanData(serviciosUrl, 'Folio Recepción'),
+            fetchAndCleanData(egresosUrl, 'Folio Egreso'),
+            fetchAndCleanData(anticiposUrl, 'Folio Anticipo'),
+            fetchAndCleanData(ventasUrl, 'Folio Venta'),
+            fetchAndCleanData(detalleVentaUrl, 'Folio Venta')
+        ]).then(([servicios, compras, anticipos, ventas, detalleVenta]) => {
+            originalData = {
+                servicios: servicios.map(r => ({ ...r, fechaRecepcionObj: parseCustomDate(r['Fecha Recepción']) })),
+                compras: compras.map(r => ({ ...r, fechaCompraObj: parseCustomDate(r['Fecha y Hora Compra']) })),
+                anticipos: anticipos.map(r => ({ ...r, fechaAnticipoObj: parseCustomDate(r['Fecha Anticipo']) })),
+                ventas: ventas.map(r => ({ ...r, fechaVentaObj: parseCustomDate(r['Fecha Venta']) })),
+                detalleVenta: detalleVenta
+            };
+            // Una vez cargados los datos, se actualizan las vistas que lo necesiten
+            masterFilterAndUpdate();
+        }).catch(error => {
+            console.error("Error crítico al cargar datos:", error);
+            // Opcional: Mostrar un mensaje de error en la UI
         });
-    });
-    backToLandingButton.addEventListener('click', (e) => {
-        e.preventDefault();
-        showLandingPage();
-    });
-
-    // Decidir vista inicial (se ejecuta inmediatamente)
-    const initialTab = window.location.hash.replace('#', '');
-    if (initialTab && folioColumns[initialTab]) {
-        showDashboard(initialTab);
-    } else {
-        showLandingPage();
     }
+
+    initializeUI();
+    loadData();
 
     function switchTab(tabId) {
         if (!document.getElementById(`${tabId}-content`)) {
@@ -152,7 +164,6 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function masterFilterAndUpdate() {
-        if (!dataLoaded) return;
         const validez = validezFilter.value;
         const filterByValidez = data => data.filter(r => validez === 'todos' || (validez === 'validos' && r.Validez !== 'CANCELADO') || (validez === 'cancelados' && r.Validez === 'CANCELADO'));
         
