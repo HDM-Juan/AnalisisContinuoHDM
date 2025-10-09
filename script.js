@@ -165,7 +165,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function masterFilterAndUpdate() {
         const validez = validezFilter.value;
-        const filterByValidez = data => data.filter(r => validez === 'todos' || (validez === 'validos' && r.Validez !== 'CANCELADO') || (validez === 'cancelados' && r.Validez === 'CANCELADO'));
+        const filterByValidez = data => {
+            if (validez === 'todos') return data;
+            return data.filter(r => r.Validez === validez);
+        };
         
         const startDate = startDateInput.valueAsDate;
         const endDate = endDateInput.valueAsDate;
@@ -176,6 +179,26 @@ document.addEventListener('DOMContentLoaded', function () {
         let fAnticipos = filterByDate(filterByValidez(originalData.anticipos), 'fechaAnticipoObj');
         let fVentas = filterByDate(filterByValidez(originalData.ventas), 'fechaVentaObj');
         
+        // Filtros específicos para Servicios
+        const serviciosVigenciaFilter = document.getElementById('servicios-vigencia-filter');
+        if (serviciosVigenciaFilter && serviciosVigenciaFilter.value !== 'todos') {
+            fServicios = fServicios.filter(r => r.Vigencia === serviciosVigenciaFilter.value);
+        }
+        const serviciosEstatusFilter = document.getElementById('servicios-estatus-filter');
+        if (serviciosEstatusFilter && serviciosEstatusFilter.value !== 'todos') {
+            fServicios = fServicios.filter(r => r.Estatus === serviciosEstatusFilter.value);
+        }
+
+        // Filtros específicos para Anticipos
+        const anticiposVigenciaFilter = document.getElementById('anticipos-vigencia-filter');
+        if (anticiposVigenciaFilter && anticiposVigenciaFilter.value !== 'todos') {
+            fAnticipos = fAnticipos.filter(r => r.Vigencia === anticiposVigenciaFilter.value);
+        }
+        const anticiposEstatusFilter = document.getElementById('anticipos-estatus-filter');
+        if (anticiposEstatusFilter && anticiposEstatusFilter.value !== 'todos') {
+            fAnticipos = fAnticipos.filter(r => r.Estatus === anticiposEstatusFilter.value);
+        }
+
         const convenioFilter = document.getElementById('convenio-filter');
         if (convenioFilter && !convenioFilter.checked) {
             fVentas = fVentas.filter(r => String(r['¿Convenio?']).toUpperCase() === 'FALSE' || !r['¿Convenio?']);
@@ -212,6 +235,27 @@ document.addEventListener('DOMContentLoaded', function () {
     
     function initializeServiciosTab() {
         document.getElementById('servicios-content').innerHTML = `
+            <div class="specific-filter-container">
+                <div class="filter-group">
+                    <label for="servicios-vigencia-filter">Vigencia:</label>
+                    <select id="servicios-vigencia-filter">
+                        <option value="todos">Todos</option>
+                        <option value="Vigente">Vigente</option>
+                        <option value="Vencido">Vencido</option>
+                        <option value="Mes Vencido">Mes Vencido</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="servicios-estatus-filter">Estatus:</label>
+                    <select id="servicios-estatus-filter">
+                        <option value="todos">Todos</option>
+                        <option value="Abierto">Abierto</option>
+                        <option value="Sin Comenzar">Sin Comenzar</option>
+                        <option value="Cerrado">Cerrado</option>
+                        <option value="En Trámite">En Trámite</option>
+                    </select>
+                </div>
+            </div>
             <section class="kpi-grid">
                 <div class="kpi-card"><h4>Total Servicios</h4><p id="total-servicios">...</p></div>
                 <div class="kpi-card"><h4>Servicios Exitosos</h4><p id="servicios-exitosos">...</p></div>
@@ -245,6 +289,26 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function initializeAnticiposTab() {
         document.getElementById('anticipos-content').innerHTML = `
+            <div class="specific-filter-container">
+                <div class="filter-group">
+                    <label for="anticipos-vigencia-filter">Vigencia:</label>
+                    <select id="anticipos-vigencia-filter">
+                        <option value="todos">Todos</option>
+                        <option value="Vigente">Vigente</option>
+                        <option value="Vencido">Vencido</option>
+                        <option value="Mes Vencido">Mes Vencido</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="anticipos-estatus-filter">Estatus:</label>
+                    <select id="anticipos-estatus-filter">
+                        <option value="todos">Todos</option>
+                        <option value="Abierto">Abierto</option>
+                        <option value="Utilizado">Utilizado</option>
+                        <option value="En Trámite">En Trámite</option>
+                    </select>
+                </div>
+            </div>
             <section class="kpi-grid">
                 <div class="kpi-card"><h4>Anticipos Recibidos</h4><p id="total-anticipos">...</p></div>
                 <div class="kpi-card"><h4># Piezas Pedidas</h4><p id="num-piezas">...</p></div>
@@ -354,7 +418,12 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    function parseCustomDate(dateString) { if (!dateString || typeof dateString !== 'string') return null; const parts = dateString.split(' ')[0].split('/'); return parts.length === 3 ? new Date(parts[2], parts[1] - 1, parts[0]) : null; }
+    function parseCustomDate(dateString) {
+        if (!dateString || typeof dateString !== 'string') return null;
+        const parts = dateString.split(' ')[0].split('/');
+        // Usar Date.UTC para que la fecha se cree en la misma zona horaria (UTC) que los campos de fecha
+        return parts.length === 3 ? new Date(Date.UTC(parts[2], parts[1] - 1, parts[0])) : null;
+    }
     function createChart(canvasId, type) { const ctx = document.getElementById(canvasId); if (!ctx) return null; const chartConfig = { type, options: { responsive: true, maintainAspectRatio: false } }; if (type === 'bar') chartConfig.options.indexAxis = 'y'; return new Chart(ctx.getContext('2d'), chartConfig); }
     function updateChartData(chart, data, categoryCol, sumCol = null) {
         if (!chart) return;
