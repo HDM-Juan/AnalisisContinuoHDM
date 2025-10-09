@@ -170,9 +170,18 @@ document.addEventListener('DOMContentLoaded', function () {
             return data.filter(r => r.Validez === validez);
         };
         
-        const startDate = startDateInput.valueAsDate;
-        const endDate = endDateInput.valueAsDate;
-        const filterByDate = (data, dateCol) => !startDate || !endDate ? data : data.filter(r => r[dateCol] >= startDate && r[dateCol] <= endDate);
+        const startDate = normalizeDateInput(startDateInput.value, false);
+        const endDate = normalizeDateInput(endDateInput.value, true);
+        const filterByDate = (data, dateCol) => {
+            if (!startDate && !endDate) return data;
+            return data.filter(r => {
+                const rowDate = r[dateCol];
+                if (!(rowDate instanceof Date) || isNaN(rowDate)) return false;
+                if (startDate && rowDate < startDate) return false;
+                if (endDate && rowDate > endDate) return false;
+                return true;
+            });
+        };
 
         let fServicios = filterByDate(filterByValidez(originalData.servicios), 'fechaRecepcionObj');
         let fCompras = filterByDate(filterByValidez(originalData.compras), 'fechaCompraObj');
@@ -423,6 +432,16 @@ document.addEventListener('DOMContentLoaded', function () {
         const parts = dateString.split(' ')[0].split('/');
         // Usar Date.UTC para que la fecha se cree en la misma zona horaria (UTC) que los campos de fecha
         return parts.length === 3 ? new Date(Date.UTC(parts[2], parts[1] - 1, parts[0])) : null;
+    }
+    function normalizeDateInput(value, endOfDay) {
+        if (!value) return null;
+        const [year, month, day] = value.split('-').map(Number);
+        if (!year || !month || !day) return null;
+        const hours = endOfDay ? 23 : 0;
+        const minutes = endOfDay ? 59 : 0;
+        const seconds = endOfDay ? 59 : 0;
+        const millis = endOfDay ? 999 : 0;
+        return new Date(Date.UTC(year, month - 1, day, hours, minutes, seconds, millis));
     }
     function createChart(canvasId, type) { const ctx = document.getElementById(canvasId); if (!ctx) return null; const chartConfig = { type, options: { responsive: true, maintainAspectRatio: false } }; if (type === 'bar') chartConfig.options.indexAxis = 'y'; return new Chart(ctx.getContext('2d'), chartConfig); }
     function updateChartData(chart, data, categoryCol, sumCol = null) {
