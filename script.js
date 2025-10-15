@@ -334,57 +334,43 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function initializeVentasTab() {
-        const ventasContent = document.getElementById('ventas-content');
-        ventasContent.innerHTML = `
-            <div class="specific-filter-container">
-                <label class="switch">
-                    <input type="checkbox" id="convenio-filter" checked>
-                    <span class="slider"></span>
-                </label>
-                <label for="convenio-filter">Incluir ventas por Convenio</label>
-            </div>
-            <section class="kpi-grid">
-                <div class="kpi-card"><h4>Total Ventas</h4><p id="total-ventas">...</p></div>
-                <div class="kpi-card"><h4>Total Pagos</h4><p id="total-pagos">...</p></div>
-                <div class="kpi-card"><h4># de Ventas</h4><p id="num-ventas">...</p></div>
-            </section>
-            <section class="charts-grid">
-                <div class="chart-container"><h3>Ventas por Tipo de Servicio</h3><canvas id="ventasServicioChart"></canvas></div>
-                <div class="chart-container"><h3>Resultados de Servicios</h3><canvas id="resultadosChart"></canvas></div>
-            </section>
-            <section class="table-container">
-                <h3>Detalle de Ventas</h3>
-                <div class="table-wrapper">
-                    <table class="data-table">
-                        <thead><tr><th>Fecha Venta</th><th>Folio Venta</th><th>Folio Recepción Final</th><th>Folio Anticipo</th><th>Anticipo en Recepción</th><th>Total Venta</th><th>Total Pagos</th></tr></thead>
-                        <tbody id="ventas-table-body"></tbody>
-                    </table>
-                </div>
-            </section>
-        `;
-        const convenioFilter = document.getElementById('convenio-filter');
-        if(convenioFilter) {
-            convenioFilter.addEventListener('change', masterFilterAndUpdate);
-        }
+        const container = document.getElementById('ventas-content');
+        container.querySelector('#ventas-kpi-container').innerHTML = `
+            <div class="kpi-card"><h4>Ingresos Totales</h4><p id="total-ventas">...</p></div>
+            <div class="kpi-card"><h4>Pagos Recibidos</h4><p id="total-pagos">...</p></div>
+            <div class="kpi-card"><h4># de Ventas</h4><p id="num-ventas">...</p></div>`;
+        container.querySelector('#ventas-charts-grid').innerHTML = `
+            <div class="chart-container"><h3>Ventas por Tipo de Servicio</h3><canvas id="ventasServicioChart"></canvas></div>
+            <div class="chart-container"><h3>Resultados de Servicio</h3><canvas id="resultadosChart"></canvas></div>`;
+        container.querySelector('#ventas-table-container').innerHTML = `
+            <h3>Detalle de Ventas</h3><div class="table-wrapper"><table class="data-table">
+            <thead><tr><th>Fecha</th><th>Folio Venta</th><th>Folio Recepción</th><th>Folio Anticipo</th><th>Total Venta</th><th>Total Pagos</th></tr></thead>
+            <tbody id="ventas-table-body"></tbody></table></div>`;
+
         charts.ventasServicio = createChart('ventasServicioChart', 'bar');
         charts.resultados = createChart('resultadosChart', 'pie');
+        container.querySelector('#ventas-table-body').addEventListener('click', handleTraceClick);
     }
 
     function updateVentasTab(data) {
-        const totalVentasEl = document.getElementById('total-ventas');
-        const totalPagosEl = document.getElementById('total-pagos');
-        const numVentasEl = document.getElementById('num-ventas');
-
-        if(totalVentasEl && totalPagosEl && numVentasEl) {
-            const totalVentas = data.reduce((sum, r) => sum + parseFloat(r['Total Venta'] || 0), 0);
-            const totalPagos = data.reduce((sum, r) => sum + parseFloat(r['Total Pagos'] || 0), 0);
-            totalVentasEl.textContent = `$${totalVentas.toLocaleString('es-MX')}`;
-            totalPagosEl.textContent = `$${totalPagos.toLocaleString('es-MX')}`;
-            numVentasEl.textContent = data.length;
-        }
+        const totalVentas = data.reduce((sum, r) => sum + (r['Total Venta'] || 0), 0);
+        const totalPagos = data.reduce((sum, r) => sum + (r['Total Pagos'] || 0), 0);
+        document.getElementById('total-ventas').textContent = `$${totalVentas.toLocaleString('es-MX', {minimumFractionDigits: 2})}`;
+        document.getElementById('total-pagos').textContent = `$${totalPagos.toLocaleString('es-MX', {minimumFractionDigits: 2})}`;
+        document.getElementById('num-ventas').textContent = data.length;
         updateChartData(charts.ventasServicio, data, 'TipoServicio', 'Total Venta');
         updateChartData(charts.resultados, data, 'Resultado Servicio');
-        renderTable('ventas-table-body', data, ['Fecha Venta', 'Folio Venta', 'Folio Recepción Final', 'Folio Anticipo', 'Anticipo en Recepción', 'Total Venta', 'Total Pagos'], folioColumns.ventas);
+        const tableBody = document.getElementById('ventas-table-body');
+        tableBody.innerHTML = '';
+        data.slice(0, 100).forEach(r => {
+            const folioRecepcionHTML = r['Folio Recepción Final'] ? `<span class="trace-link" data-folio="${r['Folio Recepción Final']}" data-target-tab="servicios">${r['Folio Recepción Final']}</span>` : '';
+            const folioAnticipoHTML = r['Folio Anticipo'] ? `<span class="trace-link" data-folio="${r['Folio Anticipo']}" data-target-tab="anticipos">${r['Folio Anticipo']}</span>` : '';
+            tableBody.innerHTML += `<tr>
+                <td>${r['Fecha Venta'] || ''}</td><td>${r['Folio Venta']}</td>
+                <td>${folioRecepcionHTML}</td><td>${folioAnticipoHTML}</td>
+                <td>$${(r['Total Venta'] || 0).toFixed(2)}</td><td>$${(r['Total Pagos'] || 0).toFixed(2)}</td>
+            </tr>`;
+        });
     }
 
     function handleTraceClick(event) {
