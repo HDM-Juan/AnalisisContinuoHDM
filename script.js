@@ -170,8 +170,12 @@ document.addEventListener('DOMContentLoaded', function () {
             return data.filter(r => r.Validez === validez);
         };
         
-        const startDate = normalizeDateInput(startDateInput.value, false);
-        const endDate = normalizeDateInput(endDateInput.value, true);
+        const startDate = startDateInput.valueAsDate;
+        const endDate = endDateInput.valueAsDate;
+        if (endDate) {
+            endDate.setHours(23, 59, 59, 999);
+        }
+
         const filterByDate = (data, dateCol) => {
             if (!startDate && !endDate) return data;
             return data.filter(r => {
@@ -416,18 +420,11 @@ document.addEventListener('DOMContentLoaded', function () {
     function parseCustomDate(dateString) {
         if (!dateString || typeof dateString !== 'string') return null;
         const parts = dateString.split(' ')[0].split('/');
-        // Usar Date.UTC para que la fecha se cree en la misma zona horaria (UTC) que los campos de fecha
-        return parts.length === 3 ? new Date(Date.UTC(parts[2], parts[1] - 1, parts[0])) : null;
-    }
-    function normalizeDateInput(value, endOfDay) {
-        if (!value) return null;
-        const [year, month, day] = value.split('-').map(Number);
-        if (!year || !month || !day) return null;
-        const hours = endOfDay ? 23 : 0;
-        const minutes = endOfDay ? 59 : 0;
-        const seconds = endOfDay ? 59 : 0;
-        const millis = endOfDay ? 999 : 0;
-        return new Date(Date.UTC(year, month - 1, day, hours, minutes, seconds, millis));
+        if (parts.length !== 3) return null;
+        const [day, month, year] = parts.map(Number);
+        if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
+        // Create date in local time to match valueAsDate
+        return new Date(year, month - 1, day);
     }
     function createChart(canvasId, type) { const ctx = document.getElementById(canvasId); if (!ctx) return null; const chartConfig = { type, options: { responsive: true, maintainAspectRatio: false } }; if (type === 'bar') chartConfig.options.indexAxis = 'y'; return new Chart(ctx.getContext('2d'), chartConfig); }
     function updateChartData(chart, data, categoryCol, sumCol = null) {
