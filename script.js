@@ -38,6 +38,113 @@ document.addEventListener('DOMContentLoaded', function () {
     const applyFiltersButton = document.getElementById('apply-filters-button');
     
     // --- MAPEO DE COLUMNAS DE FOLIO ---
+    const headerAliases = {
+        'folio##recepción': 'Folio Recepción',
+        'folio##recepcion': 'Folio Recepción',
+        'folio recepcion': 'Folio Recepción',
+        'folio recepcíon': 'Folio Recepción',
+        'folio recepción': 'Folio Recepción',
+        'folio recepcion final': 'Folio Recepción Final',
+        'folio recepción final': 'Folio Recepción Final',
+        'folio##recepción final': 'Folio Recepción Final',
+        'folio##recepcion final': 'Folio Recepción Final',
+        'folio##anticipo': 'Folio Anticipo',
+        'folio anticipo': 'Folio Anticipo',
+        'folio##anticipo que dejó': 'Folio Anticipo que Dejó',
+        'folio anticipo que dejó': 'Folio Anticipo que Dejó',
+        'folio anticipo que dejo': 'Folio Anticipo que Dejó',
+        'folio##cierre': 'Folio Cierre',
+        'folio cierre': 'Folio Cierre',
+        'folio##venta': 'Folio Venta',
+        'folio venta': 'Folio Venta',
+        'folio ventas': 'Folio Venta',
+        'datos##anticipo': 'Anticipo en Recepción',
+        'anticipo en recepción': 'Anticipo en Recepción',
+        'anticipo en recepcion': 'Anticipo en Recepción',
+        'datos anticipo': 'Anticipo en Recepción',
+        'fecha recepcion': 'Fecha Recepción',
+        'fecha recepción': 'Fecha Recepción',
+        'fecha recepción final': 'Fecha Recepción Final',
+        'fecha recepcion final': 'Fecha Recepción Final',
+        'fecha venta ': 'Fecha Venta',
+        'fecha y hora compra': 'Fecha y Hora Compra',
+        'fecha compra': 'Fecha y Hora Compra',
+        'sku refacción': 'Sku Refacción',
+        'sku refaccion': 'Sku Refacción',
+        'sku_refacción': 'Sku Refacción',
+        'sku_refaccion': 'Sku Refacción',
+        'skurefacción': 'Sku Refacción',
+        'skurefaccion': 'Sku Refacción',
+        'sku': 'Sku Refacción',
+        'refacción sku': 'Sku Refacción',
+        'sku ref': 'Sku Refacción',
+        'sku refacc': 'Sku Refacción',
+        'marca servicio': 'Marca',
+        'marca ': 'Marca',
+        'marca': 'Marca',
+        'modelo ver': 'Modelo',
+        'modelo': 'Modelo',
+        'modelo_ver': 'Modelo',
+        'ver_modelo': 'Modelo',
+        'tipo de solicitud': 'Tipo de Solicitud',
+        'subtipo solicitud': 'Subtipo Solicitud',
+        'detalle servicio': 'Detalle Servicio',
+        'tiposervicio': 'TipoServicio',
+        'tipo servicio': 'TipoServicio',
+        'tipo de servicio': 'TipoServicio',
+        'servicio mínimo': 'Servicio Mínimo',
+        'servicio minimo': 'Servicio Mínimo',
+        'servicio min': 'Servicio Mínimo',
+        'costo pieza': 'Costo Pieza',
+        'costo': 'Costo',
+        'costo total': 'Costo',
+        'total venta ': 'Total Venta',
+        'total venta': 'Total Venta',
+        'total pagos': 'Total Pagos',
+        'resultado del servicio': 'Resultado Servicio',
+        'resultado servicio': 'Resultado Servicio',
+        'validez ': 'Validez',
+        'validez': 'Validez',
+        'vigencia ': 'Vigencia',
+        'vigencia': 'Vigencia',
+        'estatus': 'Estatus',
+        'estado': 'Estado',
+        'cantidad anticipo': 'Cantidad Anticipo',
+        'folio egreso': 'Folio Egreso',
+        'egreso id': 'Folio Egreso'
+    };
+
+    function normalizeHeaderKey(key) {
+        if (!key) return '';
+        const trimmed = String(key).trim();
+        const alias = headerAliases[trimmed.toLowerCase()];
+        return alias || trimmed;
+    }
+
+    function normalizeRowKeys(row) {
+        if (!row || typeof row !== 'object') return row;
+        const normalized = {};
+        Object.keys(row).forEach(originalKey => {
+            const canonicalKey = normalizeHeaderKey(originalKey);
+            const value = row[originalKey];
+            if (!(canonicalKey in normalized) || (normalized[canonicalKey] == null && value != null)) {
+                normalized[canonicalKey] = value;
+            }
+        });
+        return normalized;
+    }
+
+    function ensurePrimaryKeys(row, keys) {
+        for (const key of keys) {
+            const canonical = normalizeHeaderKey(key);
+            const value = row[canonical];
+            if (value != null && String(value).trim() !== '') {
+                return true;
+            }
+        }
+        return false;
+    }
+
     const folioColumns = {
         servicios: { primary: 'Folio Recepción', links: { 'Folio Cierre': 'ventas', 'Folio Anticipo que Dejó': 'anticipos' } },
         compras: { primary: 'Folio Egreso', links: { 'Folio Recepción': 'servicios', 'Folio Anticipo': 'anticipos' } },
@@ -73,16 +180,17 @@ document.addEventListener('DOMContentLoaded', function () {
                 skipEmptyLines: true,
                 transformHeader: h => h.trim(),
                 complete: (results) => {
-                    const data = results.data;
+                    const data = (results.data || []).map(normalizeRowKeys);
                     if (!data || data.length === 0) return resolve([]);
                     // Corregir 'Folio Ventas' a 'Folio Venta' si es necesario
                     if (data.length > 0 && 'Folio Ventas' in data[0] && !('Folio Venta' in data[0])) {
-                        results.data.forEach(r => {
+                        data.forEach(r => {
                             r['Folio Venta'] = r['Folio Ventas'];
                             delete r['Folio Ventas'];
                         });
                     }
-                    const cleanedData = data.filter(r => r[primaryKey] != null && String(r[primaryKey]).trim() !== '');
+                    const primaryKeys = Array.isArray(primaryKey) ? primaryKey : [primaryKey];
+                    const cleanedData = data.filter(r => ensurePrimaryKeys(r, primaryKeys));
                     resolve(cleanedData);
                 },
                 error: (error) => reject(error)
