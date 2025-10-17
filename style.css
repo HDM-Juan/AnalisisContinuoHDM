@@ -34,6 +34,7 @@ body { font-family: 'Roboto', sans-serif; background-color: #f4f4f4; color: #333
 .kpi-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); text-align: center; }
 .kpi-card h4 { margin: 0 0 10px 0; color: #B22222; }
 .kpi-card p { margin: 0; font-size: 28px; font-weight: 700; color: #333; }
+.kpi-card small { display: block; margin-top: 8px; color: #6c757d; font-weight: 500; }
 .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 30px; margin-bottom: 30px; }
 .chart-container { background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); height: 400px; display: flex; flex-direction: column; }
 .chart-container h3 { margin-top: 0; text-align: center; color: #8B1A1A; }
