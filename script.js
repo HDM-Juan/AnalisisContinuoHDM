@@ -173,21 +173,17 @@ document.addEventListener('DOMContentLoaded', function () {
             if (validez === 'todos') return data;
             return data.filter(r => r.Validez === validez);
         };
+        
+        const startDate = startDateInput.valueAsDate;
+        const endDate = endDateInput.valueAsDate;
+        if (endDate) {
+            endDate.setHours(23, 59, 59, 999);
+        }
 
-        const startDate = normalizeDateInput(startDateInput.value, false);
-        const endDate = normalizeDateInput(endDateInput.value, true);
-        const filterByDate = (data, dateCol, rawCol) => {
+        const filterByDate = (data, dateCol) => {
             if (!startDate && !endDate) return data;
             return data.filter(r => {
-                let rowDate = r[dateCol];
-                if (!(rowDate instanceof Date) || isNaN(rowDate)) {
-                    if (rawCol) {
-                        rowDate = parseCustomDate(r[rawCol]);
-                        if (rowDate) {
-                            r[dateCol] = rowDate;
-                        }
-                    }
-                }
+                const rowDate = r[dateCol];
                 if (!(rowDate instanceof Date) || isNaN(rowDate)) return false;
                 if (startDate && rowDate < startDate) return false;
                 if (endDate && rowDate > endDate) return false;
@@ -195,10 +191,10 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         };
 
-        let fServicios = filterByDate(filterByValidez(originalData.servicios), 'fechaRecepcionObj', 'Fecha Recepción');
-        let fCompras = filterByDate(filterByValidez(originalData.compras), 'fechaCompraObj', 'Fecha y Hora Compra');
-        let fAnticipos = filterByDate(filterByValidez(originalData.anticipos), 'fechaAnticipoObj', 'Fecha Anticipo');
-        let fVentas = filterByDate(filterByValidez(originalData.ventas), 'fechaVentaObj', 'Fecha Venta');
+        let fServicios = filterByDate(filterByValidez(originalData.servicios), 'fechaRecepcionObj');
+        let fCompras = filterByDate(filterByValidez(originalData.compras), 'fechaCompraObj');
+        let fAnticipos = filterByDate(filterByValidez(originalData.anticipos), 'fechaAnticipoObj');
+        let fVentas = filterByDate(filterByValidez(originalData.ventas), 'fechaVentaObj');
         
         // Filtros específicos para Servicios
         const serviciosVigenciaFilter = document.getElementById('servicios-vigencia-filter');
@@ -346,188 +342,43 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function initializeVentasTab() {
-        const ventasContent = document.getElementById('ventas-content');
-        ventasContent.innerHTML = `
-            <div class="specific-filter-container">
-                <label class="switch">
-                    <input type="checkbox" id="convenio-filter" checked>
-                    <span class="slider"></span>
-                </label>
-                <label for="convenio-filter">Incluir ventas por Convenio</label>
-            </div>
-            <section class="kpi-grid">
-                <div class="kpi-card"><h4>Total Ventas</h4><p id="total-ventas">...</p></div>
-                <div class="kpi-card"><h4>Total Pagos</h4><p id="total-pagos">...</p></div>
-                <div class="kpi-card"><h4># de Ventas</h4><p id="num-ventas">...</p></div>
-            </section>
-            <section class="kpi-grid secondary-kpis">
-                <div class="kpi-card"><h4>Ventas con Anticipo</h4><p id="ventas-desde-anticipos">...</p><small id="ventas-desde-anticipos-count"></small></div>
-                <div class="kpi-card"><h4>Ventas por Servicio</h4><p id="ventas-desde-servicios">...</p><small id="ventas-desde-servicios-count"></small></div>
-                <div class="kpi-card"><h4>Ventas Directas</h4><p id="ventas-directas">...</p><small id="ventas-directas-count"></small></div>
-                <div class="kpi-card"><h4>Costos Relacionados</h4><p id="total-costos-ligados">...</p><small id="egresos-logistica"></small></div>
-                <div class="kpi-card"><h4>Otros Egresos</h4><p id="otros-egresos">...</p></div>
-                <div class="kpi-card"><h4>Margen Estimado</h4><p id="margen-estimado">...</p><small id="margen-porcentaje"></small></div>
-            </section>
-            <section class="charts-grid">
-                <div class="chart-container"><h3>Ventas por Tipo de Servicio</h3><canvas id="ventasServicioChart"></canvas></div>
-                <div class="chart-container"><h3>Resultados de Servicios</h3><canvas id="resultadosChart"></canvas></div>
-                <div class="chart-container"><h3>Tendencia de Ventas</h3><canvas id="ventasTrendChart"></canvas></div>
-                <div class="chart-container"><h3>Ventas por Marca</h3><canvas id="ventasMarcaChart"></canvas></div>
-                <div class="chart-container"><h3>Top 10 Piezas Vendidas</h3><canvas id="topPiezasChart"></canvas></div>
-                <div class="chart-container"><h3>Margen por Tipo de Servicio</h3><canvas id="margenServicioChart"></canvas></div>
-            </section>
-            <section class="table-container">
-                <h3>Top de Refacciones y Piezas Vendidas</h3>
-                <div class="table-wrapper">
-                    <table class="data-table">
-                        <thead><tr><th>SKU</th><th>Descripción</th><th>Cantidad</th><th>Total Venta</th><th>Costo Estimado</th><th>Margen</th></tr></thead>
-                        <tbody id="top-piezas-body"></tbody>
-                    </table>
-                </div>
-            </section>
-            <section class="table-container">
-                <h3>Resumen por Marca y Modelo</h3>
-                <div class="table-wrapper">
-                    <table class="data-table">
-                        <thead><tr><th>Marca</th><th>Modelos Principales</th><th>Ventas</th><th># Operaciones</th><th>Ticket Promedio</th></tr></thead>
-                        <tbody id="marca-modelo-body"></tbody>
-                    </table>
-                </div>
-            </section>
-            <section class="table-container">
-                <h3>Detalle de Ventas</h3>
-                <div class="table-wrapper">
-                    <table class="data-table">
-                        <thead><tr><th>Fecha Venta</th><th>Folio Venta</th><th>Folio Recepción Final</th><th>Folio Anticipo</th><th>Anticipo en Recepción</th><th>Total Venta</th><th>Total Pagos</th></tr></thead>
-                        <tbody id="ventas-table-body"></tbody>
-                    </table>
-                </div>
-            </section>
-            <section class="table-container">
-                <h3>Resumen de Egresos Relacionados</h3>
-                <div class="table-wrapper">
-                    <table class="data-table">
-                        <thead><tr><th>Categoría</th><th>Monto</th><th>Detalle</th></tr></thead>
-                        <tbody id="egresos-relacionados-body"></tbody>
-                    </table>
-                </div>
-            </section>
-        `;
-        const convenioFilter = document.getElementById('convenio-filter');
-        if(convenioFilter) {
-            convenioFilter.addEventListener('change', masterFilterAndUpdate);
-        }
+        const container = document.getElementById('ventas-content');
+        container.querySelector('#ventas-kpi-container').innerHTML = `
+            <div class="kpi-card"><h4>Ingresos Totales</h4><p id="total-ventas">...</p></div>
+            <div class="kpi-card"><h4>Pagos Recibidos</h4><p id="total-pagos">...</p></div>
+            <div class="kpi-card"><h4># de Ventas</h4><p id="num-ventas">...</p></div>`;
+        container.querySelector('#ventas-charts-grid').innerHTML = `
+            <div class="chart-container"><h3>Ventas por Tipo de Servicio</h3><canvas id="ventasServicioChart"></canvas></div>
+            <div class="chart-container"><h3>Resultados de Servicio</h3><canvas id="resultadosChart"></canvas></div>`;
+        container.querySelector('#ventas-table-container').innerHTML = `
+            <h3>Detalle de Ventas</h3><div class="table-wrapper"><table class="data-table">
+            <thead><tr><th>Fecha</th><th>Folio Venta</th><th>Folio Recepción</th><th>Folio Anticipo</th><th>Total Venta</th><th>Total Pagos</th></tr></thead>
+            <tbody id="ventas-table-body"></tbody></table></div>`;
+
         charts.ventasServicio = createChart('ventasServicioChart', 'bar');
         charts.resultados = createChart('resultadosChart', 'pie');
-        charts.ventasTrend = createChart('ventasTrendChart', 'line');
-        charts.ventasMarca = createChart('ventasMarcaChart', 'bar');
-        charts.topPiezas = createChart('topPiezasChart', 'bar');
-        charts.margenServicio = createChart('margenServicioChart', 'bar');
+        container.querySelector('#ventas-table-body').addEventListener('click', handleTraceClick);
     }
 
-    function updateVentasTab(data, context = {}) {
-        const totalVentasEl = document.getElementById('total-ventas');
-        const totalPagosEl = document.getElementById('total-pagos');
-        const numVentasEl = document.getElementById('num-ventas');
-
-        const totalVentas = data.reduce((sum, r) => sum + parseAmount(r['Total Venta']), 0);
-        const totalPagos = data.reduce((sum, r) => sum + parseAmount(r['Total Pagos']), 0);
-
-        if (totalVentasEl && totalPagosEl && numVentasEl) {
-            totalVentasEl.textContent = formatCurrency(totalVentas);
-            totalPagosEl.textContent = formatCurrency(totalPagos);
-            numVentasEl.textContent = data.length;
-        }
-
-        const analytics = buildSalesAnalytics(data, {
-            servicios: context.servicios || [],
-            anticipos: context.anticipos || [],
-            compras: context.compras || []
-        });
-
-        const anticiposMontoEl = document.getElementById('ventas-desde-anticipos');
-        const anticiposCountEl = document.getElementById('ventas-desde-anticipos-count');
-        if (anticiposMontoEl) anticiposMontoEl.textContent = formatCurrency(analytics.origen.anticipos.monto);
-        if (anticiposCountEl) anticiposCountEl.textContent = `${analytics.origen.anticipos.count} operaciones`;
-
-        const serviciosMontoEl = document.getElementById('ventas-desde-servicios');
-        const serviciosCountEl = document.getElementById('ventas-desde-servicios-count');
-        if (serviciosMontoEl) serviciosMontoEl.textContent = formatCurrency(analytics.origen.servicios.monto);
-        if (serviciosCountEl) serviciosCountEl.textContent = `${analytics.origen.servicios.count} operaciones`;
-
-        const directasMontoEl = document.getElementById('ventas-directas');
-        const directasCountEl = document.getElementById('ventas-directas-count');
-        if (directasMontoEl) directasMontoEl.textContent = formatCurrency(analytics.origen.directas.monto);
-        if (directasCountEl) directasCountEl.textContent = `${analytics.origen.directas.count} operaciones`;
-
-        const costosRelacionadosEl = document.getElementById('total-costos-ligados');
-        if (costosRelacionadosEl) costosRelacionadosEl.textContent = formatCurrency(analytics.egresos.relacionados.total);
-        const costosLogisticaEl = document.getElementById('egresos-logistica');
-        if (costosLogisticaEl) costosLogisticaEl.textContent = analytics.egresos.relacionados.logistica > 0
-            ? `Logística: ${formatCurrency(analytics.egresos.relacionados.logistica)}`
-            : '';
-        const otrosEgresosEl = document.getElementById('otros-egresos');
-        if (otrosEgresosEl) otrosEgresosEl.textContent = formatCurrency(analytics.egresos.otros);
-
-        const margenEstimadoEl = document.getElementById('margen-estimado');
-        const margenPorcentajeEl = document.getElementById('margen-porcentaje');
-        if (margenEstimadoEl) margenEstimadoEl.textContent = formatCurrency(analytics.margen.total);
-        if (margenPorcentajeEl) margenPorcentajeEl.textContent = totalVentas > 0
-            ? `(${(analytics.margen.total / totalVentas * 100).toFixed(1)}%)`
-            : '';
-
-        if (charts.ventasServicio) {
-            const palette = ['#1877F2', '#6c757d', '#DC3545', '#25D366', '#FF9800', '#B22222', '#8B1A1A'];
-            const colors = analytics.serviciosPorTipo.labels.map((_, idx) => palette[idx % palette.length]);
-            setChartData(charts.ventasServicio, analytics.serviciosPorTipo.labels, [{
-                label: 'Monto Vendido',
-                data: analytics.serviciosPorTipo.valores,
-                backgroundColor: colors
-            }]);
-        }
+    function updateVentasTab(data) {
+        const totalVentas = data.reduce((sum, r) => sum + (r['Total Venta'] || 0), 0);
+        const totalPagos = data.reduce((sum, r) => sum + (r['Total Pagos'] || 0), 0);
+        document.getElementById('total-ventas').textContent = `$${totalVentas.toLocaleString('es-MX', {minimumFractionDigits: 2})}`;
+        document.getElementById('total-pagos').textContent = `$${totalPagos.toLocaleString('es-MX', {minimumFractionDigits: 2})}`;
+        document.getElementById('num-ventas').textContent = data.length;
+        updateChartData(charts.ventasServicio, data, 'TipoServicio', 'Total Venta');
         updateChartData(charts.resultados, data, 'Resultado Servicio');
-        if (charts.ventasTrend) {
-            setChartData(charts.ventasTrend, analytics.tendencia.labels, [{
-                label: 'Ventas',
-                data: analytics.tendencia.valores,
-                borderColor: '#B22222',
-                backgroundColor: 'rgba(178,34,34,0.2)',
-                fill: true,
-                tension: 0.25
-            }]);
-        }
-        if (charts.ventasMarca) {
-            const palette = ['#6c757d', '#DC3545', '#25D366', '#FF9800', '#1877F2', '#B22222', '#8B1A1A'];
-            const colors = analytics.ventasPorMarca.labels.map((_, idx) => palette[idx % palette.length]);
-            setChartData(charts.ventasMarca, analytics.ventasPorMarca.labels, [{
-                label: 'Monto Vendido',
-                data: analytics.ventasPorMarca.valores,
-                backgroundColor: colors
-            }]);
-        }
-        if (charts.topPiezas) {
-            const palette = ['#FF9800', '#B22222', '#6c757d', '#25D366', '#1877F2'];
-            const colors = analytics.topPiezas.labels.map((_, idx) => palette[idx % palette.length]);
-            setChartData(charts.topPiezas, analytics.topPiezas.labels, [{
-                label: 'Total Venta',
-                data: analytics.topPiezas.valores,
-                backgroundColor: colors
-            }]);
-        }
-        if (charts.margenServicio) {
-            const palette = ['#25D366', '#1877F2', '#FF9800', '#DC3545', '#6c757d'];
-            const colors = analytics.margenPorTipo.labels.map((_, idx) => palette[idx % palette.length]);
-            setChartData(charts.margenServicio, analytics.margenPorTipo.labels, [{
-                label: 'Margen Estimado',
-                data: analytics.margenPorTipo.valores,
-                backgroundColor: colors
-            }]);
-        }
-
-        renderTable('ventas-table-body', data, ['Fecha Venta', 'Folio Venta', 'Folio Recepción Final', 'Folio Anticipo', 'Anticipo en Recepción', 'Total Venta', 'Total Pagos'], folioColumns.ventas);
-        renderTopPiezas(analytics.topPiezas.detalle);
-        renderMarcaModelo(analytics.marcaModelo);
-        renderEgresosRelacionados(analytics.egresos.resumenTabla);
+        const tableBody = document.getElementById('ventas-table-body');
+        tableBody.innerHTML = '';
+        data.slice(0, 100).forEach(r => {
+            const folioRecepcionHTML = r['Folio Recepción Final'] ? `<span class="trace-link" data-folio="${r['Folio Recepción Final']}" data-target-tab="servicios">${r['Folio Recepción Final']}</span>` : '';
+            const folioAnticipoHTML = r['Folio Anticipo'] ? `<span class="trace-link" data-folio="${r['Folio Anticipo']}" data-target-tab="anticipos">${r['Folio Anticipo']}</span>` : '';
+            tableBody.innerHTML += `<tr>
+                <td>${r['Fecha Venta'] || ''}</td><td>${r['Folio Venta']}</td>
+                <td>${folioRecepcionHTML}</td><td>${folioAnticipoHTML}</td>
+                <td>$${(r['Total Venta'] || 0).toFixed(2)}</td><td>$${(r['Total Pagos'] || 0).toFixed(2)}</td>
+            </tr>`;
+        });
     }
 
     function handleTraceClick(event) {
@@ -570,112 +421,14 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    function parseCustomDate(dateValue) {
-        if (!dateValue) return null;
-        if (dateValue instanceof Date) {
-            return isNaN(dateValue) ? null : dateValue;
-        }
-
-        const raw = String(dateValue).trim();
-        if (!raw) return null;
-
-        // Intentar formato ISO (YYYY-MM-DD)
-        const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
-        if (isoMatch) {
-            const year = parseInt(isoMatch[1], 10);
-            const month = parseInt(isoMatch[2], 10);
-            const day = parseInt(isoMatch[3], 10);
-            if (isValidDateParts(year, month, day)) {
-                return new Date(Date.UTC(year, month - 1, day));
-            }
-        }
-
-        // Intentar formatos con separadores (DD/MM/AAAA, MM/DD/AAAA, AAAA/MM/DD, etc.)
-        const generalMatch = raw.match(/(\d{1,4})[\/-](\d{1,2})[\/-](\d{2,4})/);
-        if (generalMatch) {
-            let part1 = parseInt(generalMatch[1], 10);
-            let part2 = parseInt(generalMatch[2], 10);
-            let part3 = parseInt(generalMatch[3], 10);
-
-            if (generalMatch[3].length === 2) {
-                part3 += part3 >= 70 ? 1900 : 2000;
-            }
-
-            let day, month, year;
-            if (generalMatch[1].length === 4) {
-                year = part1;
-                month = part2;
-                day = part3;
-            } else if (part1 > 12 && part2 <= 12) {
-                day = part1;
-                month = part2;
-                year = part3;
-            } else if (part2 > 12 && part1 <= 12) {
-                month = part1;
-                day = part2;
-                year = part3;
-            } else {
-                day = part1;
-                month = part2;
-                year = part3;
-            }
-
-            if (isValidDateParts(year, month, day)) {
-                return new Date(Date.UTC(year, month - 1, day));
-            }
-        }
-
-        // Intentar interpretación por número de serie de Excel
-        const serial = Number(raw);
-        if (!Number.isNaN(serial) && serial > 59) {
-            const excelEpoch = Date.UTC(1899, 11, 30);
-            return new Date(excelEpoch + serial * 24 * 60 * 60 * 1000);
-        }
-
-        return null;
-    }
-
-    function isValidDateParts(year, month, day) {
-        if (!year || !month || !day) return false;
-        if (month < 1 || month > 12 || day < 1 || day > 31) return false;
-        const date = new Date(Date.UTC(year, month - 1, day));
-        return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
-    }
-    function normalizeDateInput(value, endOfDay) {
-        if (!value) return null;
-        const [year, month, day] = value.split('-').map(Number);
-        if (!year || !month || !day) return null;
-        const hours = endOfDay ? 23 : 0;
-        const minutes = endOfDay ? 59 : 0;
-        const seconds = endOfDay ? 59 : 0;
-        const millis = endOfDay ? 999 : 0;
-        return new Date(Date.UTC(year, month - 1, day, hours, minutes, seconds, millis));
-    }
-    function createChart(canvasId, type) {
-        const canvas = document.getElementById(canvasId);
-        if (!canvas) return null;
-        const config = {
-            type,
-            data: { labels: [], datasets: [] },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false
-            }
-        };
-        if (type === 'bar') {
-            config.options.indexAxis = 'y';
-            config.options.scales = {
-                x: { beginAtZero: true },
-                y: { ticks: { autoSkip: false } }
-            };
-        }
-        if (type === 'line') {
-            config.options.scales = {
-                x: { type: 'category', ticks: { autoSkip: true } },
-                y: { beginAtZero: true }
-            };
-        }
-        return new Chart(canvas.getContext('2d'), config);
+    function parseCustomDate(dateString) {
+        if (!dateString || typeof dateString !== 'string') return null;
+        const parts = dateString.split(' ')[0].split('/');
+        if (parts.length !== 3) return null;
+        const [day, month, year] = parts.map(Number);
+        if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
+        // Create date in local time to match valueAsDate
+        return new Date(year, month - 1, day);
     }
     function updateChartData(chart, data, categoryCol, sumCol = null) {
         if (!chart) return;

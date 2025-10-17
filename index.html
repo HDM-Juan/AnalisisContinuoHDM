@@ -86,7 +86,21 @@
             <div id="folio-filter-status" class="folio-filter-status" style="display: none;"></div>
         </section>
 
-        <div id="ventas-content" class="tab-content"></div>
+        <div id="ventas-content" class="tab-content">
+            <div class="specific-filter-container">
+                <label class="switch">
+                    <input type="checkbox" id="convenio-filter" checked>
+                    <span class="slider"></span>
+                </label>
+                <label for="convenio-filter">Incluir ventas por Convenio</label>
+            </div>
+            <section id="ventas-kpi-container" class="kpi-grid">
+                </section>
+            <section id="ventas-charts-grid" class="charts-grid">
+                </section>
+            <section id="ventas-table-container" class="table-container">
+                </section>
+        </div>
         <div id="servicios-content" class="tab-content"></div>
         <div id="anticipos-content" class="tab-content"></div>
         <div id="compras-content" class="tab-content"></div>
