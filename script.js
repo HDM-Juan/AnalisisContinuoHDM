@@ -18,6 +18,8 @@ document.addEventListener('DOMContentLoaded', function () {
         detalleVenta: []
     };
     let charts = {};
+    let detalleVentaIndex = new Map();
+    let comprasSkuIndex = new Map();
     let activeFolioFilter = null;
 
     // --- ELEMENTOS DEL DOM ---
@@ -142,6 +144,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 ventas: ventas.map(r => ({ ...r, fechaVentaObj: parseCustomDate(r['Fecha Venta']) })),
                 detalleVenta: detalleVenta
             };
+            detalleVentaIndex = buildDetalleIndex(originalData.detalleVenta);
+            comprasSkuIndex = buildComprasSkuIndex(originalData.compras);
             // Una vez cargados los datos, se actualizan las vistas que lo necesiten
             masterFilterAndUpdate();
         }).catch(error => {
@@ -243,7 +247,7 @@ document.addEventListener('DOMContentLoaded', function () {
         updateServiciosTab(fServicios);
         updateComprasTab(fCompras);
         updateAnticiposTab(fAnticipos);
-        updateVentasTab(fVentas);
+        updateVentasTab(fVentas, { servicios: fServicios, anticipos: fAnticipos, compras: fCompras });
     }
     
     function initializeServiciosTab() {
@@ -426,10 +430,9 @@ document.addEventListener('DOMContentLoaded', function () {
         // Create date in local time to match valueAsDate
         return new Date(year, month - 1, day);
     }
-    function createChart(canvasId, type) { const ctx = document.getElementById(canvasId); if (!ctx) return null; const chartConfig = { type, options: { responsive: true, maintainAspectRatio: false } }; if (type === 'bar') chartConfig.options.indexAxis = 'y'; return new Chart(ctx.getContext('2d'), chartConfig); }
     function updateChartData(chart, data, categoryCol, sumCol = null) {
         if (!chart) return;
-        const filteredData = data.filter(row => row[categoryCol] && String(row[categoryCol]).trim());
+        const filteredData = data.filter(row => row && row[categoryCol] && String(row[categoryCol]).trim());
 
         const counts = filteredData.reduce((acc, row) => {
             const category = row[categoryCol];
@@ -438,12 +441,381 @@ document.addEventListener('DOMContentLoaded', function () {
             return acc;
         }, {});
 
-        let sorted = Object.entries(counts).sort(([, a], [, b]) => b - a);
+        const sorted = Object.entries(counts).sort(([, a], [, b]) => b - a);
         chart.data.labels = sorted.map(item => item[0]);
         chart.data.datasets = [{
             data: sorted.map(item => item[1]),
             backgroundColor: ['#B22222', '#8B1A1A', '#DC3545', '#6c757d', '#1877F2', '#25D366', '#FF9800']
         }];
         chart.update();
+    }
+
+    function setChartData(chart, labels, datasets) {
+        if (!chart) return;
+        chart.data.labels = labels;
+        chart.data.datasets = datasets;
+        chart.update();
+    }
+
+    function renderTopPiezas(items) {
+        const body = document.getElementById('top-piezas-body');
+        if (!body) return;
+        body.innerHTML = '';
+        items.forEach(item => {
+            body.innerHTML += `<tr><td>${item.sku || ''}</td><td>${item.descripcion || ''}</td><td>${item.cantidad}</td><td>${formatCurrency(item.venta)}</td><td>${formatCurrency(item.costo)}</td><td>${formatCurrency(item.margen)}</td></tr>`;
+        });
+    }
+
+    function renderMarcaModelo(items) {
+        const body = document.getElementById('marca-modelo-body');
+        if (!body) return;
+        body.innerHTML = '';
+        items.forEach(item => {
+            const modelos = item.modelos.length > 0
+                ? item.modelos.slice(0, 3).map(m => `${m.nombre} (${m.count})`).join('<br>')
+                : 'Sin datos';
+            body.innerHTML += `<tr><td>${item.marca}</td><td>${modelos}</td><td>${formatCurrency(item.venta)}</td><td>${item.count}</td><td>${formatCurrency(item.ticketPromedio)}</td></tr>`;
+        });
+    }
+
+    function renderEgresosRelacionados(items) {
+        const body = document.getElementById('egresos-relacionados-body');
+        if (!body) return;
+        body.innerHTML = '';
+        items.forEach(item => {
+            body.innerHTML += `<tr><td>${item.categoria}</td><td>${formatCurrency(item.monto)}</td><td>${item.detalle}</td></tr>`;
+        });
+    }
+
+    function buildDetalleIndex(rows) {
+        const index = new Map();
+        if (!Array.isArray(rows)) return index;
+        rows.forEach(row => {
+            const folio = normalizeFolio(getRowValue(row, ['Folio Venta', 'Folio Venta#', 'Folio##Venta']));
+            if (!folio) return;
+            if (!index.has(folio)) index.set(folio, []);
+            index.get(folio).push(row);
+        });
+        return index;
+    }
+
+    function buildComprasSkuIndex(rows) {
+        const index = new Map();
+        if (!Array.isArray(rows)) return index;
+        rows.forEach(row => {
+            const sku = normalizeSku(getRowValue(row, ['SKU Refacción', 'Sku Refacción', 'SKURefacción', 'skurefacción', 'SKU Refaccion', 'SKU', 'Refacción SKU']));
+            if (!sku) return;
+            const monto = parseAmount(getRowValue(row, ['Monto', 'Costo', 'Costo Pieza', 'Costo pieza', 'Costo Unitario']));
+            if (!index.has(sku)) {
+                index.set(sku, { sku, montoTotal: 0, registros: [] });
+            }
+            const entry = index.get(sku);
+            entry.montoTotal += monto;
+            entry.registros.push(row);
+        });
+        return index;
+    }
+
+    function buildSalesAnalytics(ventas, contexto) {
+        const servicios = Array.isArray(contexto.servicios) ? contexto.servicios : [];
+        const anticipos = Array.isArray(contexto.anticipos) ? contexto.anticipos : [];
+        const compras = Array.isArray(contexto.compras) ? contexto.compras : [];
+
+        const serviciosPorFolio = new Map();
+        const serviciosPorRecepcionFinal = new Map();
+        servicios.forEach(row => {
+            const folioRecepcion = normalizeFolio(getRowValue(row, ['Folio Recepción', 'Folio##Recepción', 'Folio Recepcion']));
+            const folioRecepcionFinal = normalizeFolio(getRowValue(row, ['Folio Recepción Final', 'Folio Recepcion Final']));
+            if (folioRecepcion) serviciosPorFolio.set(folioRecepcion, row);
+            if (folioRecepcionFinal) serviciosPorRecepcionFinal.set(folioRecepcionFinal, row);
+        });
+
+        const anticiposPorFolio = new Map();
+        const anticiposPorRecepcion = new Map();
+        anticipos.forEach(row => {
+            const folioAnticipo = normalizeFolio(getRowValue(row, ['Folio Anticipo', 'Folio##Anticipo']));
+            const folioRecepcion = normalizeFolio(getRowValue(row, ['Folio Recepción', 'Folio Recepcion', 'Folio Recepción Ligado']));
+            if (folioAnticipo) anticiposPorFolio.set(folioAnticipo, row);
+            if (folioRecepcion) anticiposPorRecepcion.set(folioRecepcion, row);
+        });
+
+        const serviciosFolios = new Set([...serviciosPorFolio.keys(), ...serviciosPorRecepcionFinal.keys()]);
+        const anticiposFolios = new Set([...anticiposPorFolio.keys(), ...anticiposPorRecepcion.keys()]);
+
+        const tendenciaMapa = new Map();
+        const marcaModeloMapa = new Map();
+        const origen = {
+            anticipos: { monto: 0, count: 0 },
+            servicios: { monto: 0, count: 0 },
+            directas: { monto: 0, count: 0 }
+        };
+        const margenPorTipo = new Map();
+        const topPiezasMapa = new Map();
+
+        const ventasFolios = new Set();
+
+        ventas.forEach(venta => {
+            const folioVenta = normalizeFolio(getRowValue(venta, ['Folio Venta', 'Folio##Venta']));
+            if (folioVenta) ventasFolios.add(folioVenta);
+            const montoVenta = parseAmount(venta['Total Venta']);
+            const fecha = venta.fechaVentaObj instanceof Date && !isNaN(venta.fechaVentaObj) ? venta.fechaVentaObj : parseCustomDate(venta['Fecha Venta']);
+            if (fecha instanceof Date && !isNaN(fecha)) {
+                const periodo = `${fecha.getUTCFullYear()}-${String(fecha.getUTCMonth() + 1).padStart(2, '0')}`;
+                tendenciaMapa.set(periodo, (tendenciaMapa.get(periodo) || 0) + montoVenta);
+            }
+
+            const folioRecepcion = normalizeFolio(getRowValue(venta, ['Folio Recepción Final', 'Folio Recepción', 'Folio Recepcion Final']));
+            const folioAnticipo = normalizeFolio(getRowValue(venta, ['Folio Anticipo', 'Anticipo en Recepción', 'Datos Anticipo']));
+
+            const servicio = folioRecepcion ? (serviciosPorRecepcionFinal.get(folioRecepcion) || serviciosPorFolio.get(folioRecepcion)) : null;
+            const anticipo = folioAnticipo ? anticiposPorFolio.get(folioAnticipo) : (folioRecepcion ? anticiposPorRecepcion.get(folioRecepcion) : null);
+
+            if (anticipo) {
+                origen.anticipos.monto += montoVenta;
+                origen.anticipos.count += 1;
+            } else if (servicio) {
+                origen.servicios.monto += montoVenta;
+                origen.servicios.count += 1;
+            } else {
+                origen.directas.monto += montoVenta;
+                origen.directas.count += 1;
+            }
+
+            const tipoServicio = getRowValue(servicio, ['TipoServicio', 'Tipo de Servicio', 'tipo de solicitud']);
+
+            const marca = getRowValue(servicio, ['Marca', 'marca', 'Marca Servicio']) || getRowValue(anticipo, ['Marca', 'marca']) || getRowValue(venta, ['Marca']);
+            const modelo = getRowValue(servicio, ['Modelo', 'modelo', 'Modelo ver', 'modelo_ver']) || getRowValue(anticipo, ['ver_modelo', 'Modelo', 'Modelo Ver']) || getRowValue(venta, ['Modelo']);
+            const marcaKey = marca || 'Sin Marca';
+            if (!marcaModeloMapa.has(marcaKey)) {
+                marcaModeloMapa.set(marcaKey, { marca: marcaKey, venta: 0, count: 0, modelos: new Map() });
+            }
+            const marcaEntry = marcaModeloMapa.get(marcaKey);
+            marcaEntry.venta += montoVenta;
+            marcaEntry.count += 1;
+            if (modelo) {
+                const modeloKey = modelo;
+                marcaEntry.modelos.set(modeloKey, (marcaEntry.modelos.get(modeloKey) || 0) + 1);
+            }
+
+            const tipoClave = tipoServicio || 'Sin Tipo';
+            if (!margenPorTipo.has(tipoClave)) {
+                margenPorTipo.set(tipoClave, { venta: 0, costo: 0 });
+            }
+            const margenEntry = margenPorTipo.get(tipoClave);
+            margenEntry.venta += montoVenta;
+
+            let costoVenta = 0;
+            const detalles = folioVenta ? detalleVentaIndex.get(folioVenta) : null;
+            if (detalles && detalles.length > 0) {
+                detalles.forEach(det => {
+                    const sku = normalizeSku(getRowValue(det, ['SKU', 'SKU Refacción', 'Sku Refacción', 'SKURefacción', 'SkuRefacción']));
+                    const descripcion = getRowValue(det, ['Descripción', 'Descripcion', 'Detalle', 'Pieza', 'Concepto']) || (sku || 'Detalle no especificado');
+                    const cantidad = parseFloat(getRowValue(det, ['Cantidad', 'Qty', 'Cantidad Vendida'])) || 1;
+                    const importe = parseAmount(getRowValue(det, ['Importe', 'Total', 'Subtotal']));
+                    const precioUnitario = parseAmount(getRowValue(det, ['Precio Venta', 'Precio unitario', 'Precio Unitario']));
+                    let totalLinea = importe;
+                    if (totalLinea === 0 && precioUnitario > 0) {
+                        totalLinea = precioUnitario * cantidad;
+                    }
+                    if (totalLinea === 0 && detalles.length > 0) {
+                        totalLinea = montoVenta / detalles.length;
+                    }
+                    if (totalLinea === 0) {
+                        totalLinea = montoVenta;
+                    }
+
+                    const costoDetalle = parseAmount(getRowValue(det, ['Costo', 'Costo Pieza', 'Costo Unitario']));
+                    let costoAsignado = 0;
+                    if (costoDetalle > 0) {
+                        costoAsignado = costoDetalle;
+                    } else if (sku && comprasSkuIndex.has(sku)) {
+                        const compraInfo = comprasSkuIndex.get(sku);
+                        costoAsignado = (compraInfo.montoTotal / Math.max(compraInfo.registros.length, 1)) * cantidad;
+                    }
+                    const key = sku || descripcion;
+                    if (!topPiezasMapa.has(key)) {
+                        topPiezasMapa.set(key, { sku, descripcion, cantidad: 0, venta: 0, costo: 0 });
+                    }
+                    const entry = topPiezasMapa.get(key);
+                    entry.cantidad += cantidad;
+                    entry.venta += totalLinea;
+                    entry.costo += costoAsignado;
+                    costoVenta += costoAsignado;
+                });
+            } else {
+                const sku = normalizeSku(getRowValue(anticipo, ['SKU Refacción', 'Sku Refacción', 'SKU']));
+                const descripcion = getRowValue(anticipo, ['Pieza', 'Pieza solicitada', 'Detalle']) || getRowValue(servicio, ['Detalle servicio', 'Detalle Servicio']);
+                if (sku || descripcion) {
+                    const key = sku || descripcion;
+                    if (!topPiezasMapa.has(key)) {
+                        topPiezasMapa.set(key, { sku, descripcion: descripcion || sku, cantidad: 0, venta: 0, costo: 0 });
+                    }
+                    const entry = topPiezasMapa.get(key);
+                    entry.cantidad += 1;
+                    entry.venta += montoVenta;
+                    if (sku && comprasSkuIndex.has(sku)) {
+                        const compraInfo = comprasSkuIndex.get(sku);
+                        const costoPromedio = compraInfo.montoTotal / Math.max(compraInfo.registros.length, 1);
+                        entry.costo += costoPromedio;
+                        costoVenta += costoPromedio;
+                    }
+                }
+            }
+
+            margenEntry.costo += costoVenta;
+        });
+
+        const piezasConMargen = Array.from(topPiezasMapa.values()).map(item => {
+            const costoEstimado = item.costo;
+            const margen = item.venta - costoEstimado;
+            return { ...item, costo: costoEstimado, margen };
+        }).sort((a, b) => b.venta - a.venta);
+
+        const topPiezas = piezasConMargen.slice(0, 10);
+
+        const serviciosPorTipo = Array.from(margenPorTipo.entries()).map(([tipo, valores]) => {
+            return { tipo, venta: valores.venta, costo: valores.costo, margen: valores.venta - valores.costo };
+        });
+
+        const tendencia = Array.from(tendenciaMapa.entries()).sort(([a], [b]) => a.localeCompare(b));
+
+        const marcaModelo = Array.from(marcaModeloMapa.values()).map(entry => {
+            const modelos = Array.from(entry.modelos.entries()).map(([nombre, count]) => ({ nombre, count }))
+                .sort((a, b) => b.count - a.count);
+            return {
+                marca: entry.marca,
+                venta: entry.venta,
+                count: entry.count,
+                ticketPromedio: entry.count > 0 ? entry.venta / entry.count : 0,
+                modelos
+            };
+        }).sort((a, b) => b.venta - a.venta).slice(0, 15);
+
+        const egresosResumen = calcularEgresosRelacionados(compras, {
+            serviciosFolios,
+            anticiposFolios,
+            ventasFolios,
+            piezas: piezasConMargen
+        });
+
+        const margenTotal = piezasConMargen.reduce((sum, item) => sum + item.margen, 0);
+
+        return {
+            origen,
+            tendencia: {
+                labels: tendencia.map(([periodo]) => periodo),
+                valores: tendencia.map(([, valor]) => valor)
+            },
+            ventasPorMarca: {
+                labels: marcaModelo.map(item => item.marca),
+                valores: marcaModelo.map(item => item.venta)
+            },
+            serviciosPorTipo: {
+                labels: serviciosPorTipo.map(item => item.tipo),
+                valores: serviciosPorTipo.map(item => item.venta)
+            },
+            margenPorTipo: {
+                labels: serviciosPorTipo.map(item => item.tipo),
+                valores: serviciosPorTipo.map(item => item.margen)
+            },
+            topPiezas: {
+                labels: topPiezas.map(item => item.descripcion || item.sku || 'Sin descripción'),
+                valores: topPiezas.map(item => item.venta),
+                detalle: topPiezas
+            },
+            marcaModelo,
+            egresos: egresosResumen,
+            margen: { total: margenTotal }
+        };
+    }
+
+    function calcularEgresosRelacionados(compras, referencias) {
+        let relacionados = 0;
+        let relacionadosLogistica = 0;
+        let otros = 0;
+        const resumenTabla = [];
+        const skuSet = new Set((referencias.piezas || []).map(item => normalizeSku(item.sku)).filter(Boolean));
+
+        compras.forEach(row => {
+            const monto = parseAmount(getRowValue(row, ['Monto', 'Costo', 'Costo Pieza', 'Costo pieza', 'Importe']));
+            if (monto === 0) return;
+            const folioRecepcion = normalizeFolio(getRowValue(row, ['Folio Recepción', 'Folio Recepcion']));
+            const folioAnticipo = normalizeFolio(getRowValue(row, ['Folio Anticipo', 'Folio##Anticipo']));
+            const folioVenta = normalizeFolio(getRowValue(row, ['Folio Venta', 'Folio##Venta']));
+            const sku = normalizeSku(getRowValue(row, ['SKU Refacción', 'Sku Refacción', 'SKU']));
+            const tipo = (getRowValue(row, ['Tipo', 'tipo']) || '').toString().toLowerCase();
+            const subtipo = (getRowValue(row, ['Subtipo', 'subtipo', 'Subtipo solicitud']) || '').toString().toLowerCase();
+            const tipoServicio = (getRowValue(row, ['Tipo Servicio', 'tipo servicio']) || '').toString().toLowerCase();
+            const esLogistica = tipo.includes('log') || subtipo.includes('log') || tipoServicio.includes('log');
+
+            const relacionado = (folioRecepcion && referencias.serviciosFolios.has(folioRecepcion)) ||
+                (folioAnticipo && referencias.anticiposFolios.has(folioAnticipo)) ||
+                (folioVenta && referencias.ventasFolios.has(folioVenta)) ||
+                (sku && skuSet.has(sku));
+
+            if (relacionado) {
+                relacionados += monto;
+                if (esLogistica) {
+                    relacionadosLogistica += monto;
+                }
+            } else {
+                otros += monto;
+            }
+        });
+
+        if (relacionados > 0) {
+            resumenTabla.push({ categoria: 'Costos ligados a ventas', monto: relacionados, detalle: 'Compras, refacciones y logística asociada a los folios filtrados' });
+        }
+        if (relacionadosLogistica > 0) {
+            resumenTabla.push({ categoria: 'Logística asociada', monto: relacionadosLogistica, detalle: 'Servicios de logística vinculados a recepciones o anticipos' });
+        }
+        if (otros > 0) {
+            resumenTabla.push({ categoria: 'Otros egresos', monto: otros, detalle: 'Gastos sin vínculo directo con las ventas filtradas' });
+        }
+
+        return {
+            relacionados: {
+                total: relacionados,
+                logistica: relacionadosLogistica
+            },
+            otros,
+            resumenTabla
+        };
+    }
+
+    function getRowValue(row, keys) {
+        if (!row) return null;
+        for (const key of keys) {
+            if (key in row && row[key] != null && String(row[key]).trim() !== '') {
+                return row[key];
+            }
+        }
+        return null;
+    }
+
+    function parseAmount(value) {
+        if (!value && value !== 0) return 0;
+        if (typeof value === 'number') {
+            return Number.isFinite(value) ? value : 0;
+        }
+        const normalized = String(value).replace(/[^0-9,.-]/g, '').replace(/,/g, '.');
+        const parsed = parseFloat(normalized);
+        return Number.isFinite(parsed) ? parsed : 0;
+    }
+
+    function formatCurrency(value) {
+        const amount = Number(value);
+        const safeAmount = Number.isFinite(amount) ? amount : 0;
+        return `$${safeAmount.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+
+    function normalizeFolio(value) {
+        if (!value) return null;
+        return String(value).toUpperCase().replace(/[^A-Z0-9]/g, '');
+    }
+
+    function normalizeSku(value) {
+        if (!value) return null;
+        return String(value).toUpperCase().replace(/[^A-Z0-9]/g, '');
     }
 });
