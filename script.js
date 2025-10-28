@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', function () {
     // --- URLs DE DATOS ---
-    const toProxyUrl = (originalUrl) => `/api/data?url=${encodeURIComponent(originalUrl)}`;
+    const toProxyUrl = (originalUrl) => `https://api.allorigins.win/raw?url=${encodeURIComponent(originalUrl)}`;
     const gid_base = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRxKT2sTncuJZP4_Bov1Gw1j7ixqNTfW7yGNn8nmAz8gDPauVeBt-8zqCEZWABXI0-BBDEQ4eTvZZkV/pub?single=true&output=csv';
 
     const serviciosUrl = toProxyUrl(`${gid_base}&gid=748915905`);
