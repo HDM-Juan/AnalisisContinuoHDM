@@ -153,6 +153,42 @@ document.addEventListener('DOMContentLoaded', function () {
     };
 
     // --- LÓGICA DE NAVEGACIÓN Y VISTAS ---
+    function setDefaultFilters() {
+        // Por defecto: Este mes, agregación diaria, Acumulando, Comparar Mes Anterior y mismo periodo de año anterior.
+        document.getElementById('periodo-select').value = 'este-mes';
+        document.getElementById('agregacion-select').value = 'diario';
+        document.getElementById('acumular-toggle').checked = true;
+
+        const compararSelect = document.getElementById('comparar-select');
+        const defaultCompareValues = ['periodo-anterior', 'mismo-periodo-ano-anterior'];
+        Array.from(compararSelect.options).forEach(option => {
+            option.selected = defaultCompareValues.includes(option.value);
+        });
+
+        document.getElementById('borrar-seleccion-btn').addEventListener('click', () => {
+            Array.from(compararSelect.options).forEach(option => {
+                option.selected = (option.value === 'sin-comparar');
+            });
+        });
+    }
+
+    function setupCollapsibleSections() {
+        const headers = document.querySelectorAll('.subsection-header');
+        headers.forEach(header => {
+            header.addEventListener('click', () => {
+                const content = header.nextElementSibling;
+                const icon = header.querySelector('.toggle-icon');
+                if (content.style.display === 'none') {
+                    content.style.display = 'block';
+                    icon.textContent = '-';
+                } else {
+                    content.style.display = 'none';
+                    icon.textContent = '+';
+                }
+            });
+        });
+    }
+
     function showDashboard(tabId = 'ventas') {
         landingView.style.display = 'none';
         dashboardView.style.display = 'block';
@@ -233,6 +269,9 @@ document.addEventListener('DOMContentLoaded', function () {
         } else {
             showLandingPage();
         }
+
+        setupCollapsibleSections();
+        setDefaultFilters();
     }
 
     // --- CARGA DE DATOS ---

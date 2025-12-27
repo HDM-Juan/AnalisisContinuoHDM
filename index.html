@@ -55,6 +55,48 @@
 
     <!-- Vista del Dashboard (Oculta por defecto) -->
     <main id="dashboard-view" class="container" style="display: none;">
+        <section class="main-config-panel">
+            <div class="config-group">
+                <label for="periodo-select">Periodo:</label>
+                <select id="periodo-select">
+                    <option value="este-mes">Este Mes</option>
+                    <option value="otro-mes">Otro Mes</option>
+                    <option value="este-bimestre">Este Bimestre</option>
+                    <option value="este-trimestre">Este Trimestre</option>
+                    <option value="este-semestre">Este Semestre</option>
+                    <option value="este-ano">Este año</option>
+                </select>
+            </div>
+            <div class="config-group">
+                <label for="agregacion-select">Agregación:</label>
+                <select id="agregacion-select">
+                    <option value="folio">Por Folio (sin agregación)</option>
+                    <option value="diario">Diario</option>
+                    <option value="semanal">Semanal</option>
+                    <option value="quincenal">Quincenal</option>
+                    <option value="mensual">Mensual</option>
+                </select>
+            </div>
+            <div class="config-group">
+                <label for="acumular-toggle">Presentar Datos Acumulándose:</label>
+                <label class="switch">
+                    <input type="checkbox" id="acumular-toggle" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="config-group">
+                <label for="comparar-select">Comparar:</label>
+                <select id="comparar-select" multiple>
+                    <option value="sin-comparar">Sin Comparar</option>
+                    <option value="periodo-anterior">Periodo Anterior</option>
+                    <option value="segundo-periodo-anterior">Segundo Periodo Anterior</option>
+                    <option value="mismo-periodo-ano-anterior">Mismo Periodo año Anterior</option>
+                </select>
+            </div>
+            <div class="config-group">
+                <button id="borrar-seleccion-btn">Borrar Selección</button>
+            </div>
+        </section>
         <nav class="tab-nav">
             <button class="tab-button" data-tab="ventas">Ventas</button>
             <button class="tab-button" data-tab="servicios">Servicios</button>
@@ -87,23 +129,120 @@
         </section>
 
         <div id="ventas-content" class="tab-content">
-            <div class="specific-filter-container">
-                <label class="switch">
-                    <input type="checkbox" id="convenio-filter" checked>
-                    <span class="slider"></span>
-                </label>
-                <label for="convenio-filter">Incluir ventas por Convenio</label>
+            <div class="collapsible-subsection">
+                <div class="subsection-header"><h4>Configuración Inicial</h4><span class="toggle-icon">-</span></div>
+                <div class="subsection-content">
+                    <div class="config-cards-container">
+                        <div class="config-card">
+                            <h5>Filtros</h5>
+                            <!-- Content for Filtros card -->
+                        </div>
+                        <div class="config-card">
+                            <h5>Métricas</h5>
+                            <div class="metrics-options">
+                                <label><input type="checkbox" name="metric" value="total-ventas" checked> 💲Total Ventas</label>
+                                <label><input type="checkbox" name="metric" value="total-pagos"> 💸Total Pagos</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="specific-filter-container">
+                        <label class="switch">
+                            <input type="checkbox" id="convenio-filter" checked>
+                            <span class="slider"></span>
+                        </label>
+                        <label for="convenio-filter">Incluir ventas por Convenio</label>
+                    </div>
+                </div>
             </div>
-            <section id="ventas-kpi-container" class="kpi-grid">
-                </section>
-            <section id="ventas-charts-grid" class="charts-grid">
-                </section>
-            <section id="ventas-table-container" class="table-container">
-                </section>
+            <div class="collapsible-subsection">
+                <div class="subsection-header"><h4>Gráfico</h4><span class="toggle-icon">+</span></div>
+                <div class="subsection-content" style="display: none;">
+                    <section id="ventas-charts-grid" class="charts-grid"></section>
+                </div>
+            </div>
+            <div class="collapsible-subsection">
+                <div class="subsection-header"><h4>KPI</h4><span class="toggle-icon">+</span></div>
+                <div class="subsection-content" style="display: none;">
+                    <section id="ventas-kpi-container" class="kpi-grid"></section>
+                </div>
+            </div>
+            <div class="collapsible-subsection">
+                <div class="subsection-header"><h4>Desgloses</h4><span class="toggle-icon">+</span></div>
+                <div class="subsection-content" style="display: none;"></div>
+            </div>
+            <div class="collapsible-subsection">
+                <div class="subsection-header"><h4>Tabla</h4><span class="toggle-icon">+</span></div>
+                <div class="subsection-content" style="display: none;">
+                    <section id="ventas-table-container" class="table-container"></section>
+                </div>
+            </div>
         </div>
-        <div id="servicios-content" class="tab-content"></div>
-        <div id="anticipos-content" class="tab-content"></div>
-        <div id="compras-content" class="tab-content"></div>
+        <div id="servicios-content" class="tab-content">
+            <div class="collapsible-subsection">
+                <div class="subsection-header"><h4>Configuración Inicial</h4><span class="toggle-icon">-</span></div>
+                <div class="subsection-content"></div>
+            </div>
+            <div class="collapsible-subsection">
+                <div class="subsection-header"><h4>Gráfico</h4><span class="toggle-icon">+</span></div>
+                <div class="subsection-content" style="display: none;"></div>
+            </div>
+            <div class="collapsible-subsection">
+                <div class="subsection-header"><h4>KPI</h4><span class="toggle-icon">+</span></div>
+                <div class="subsection-content" style="display: none;"></div>
+            </div>
+            <div class="collapsible-subsection">
+                <div class="subsection-header"><h4>Desgloses</h4><span class="toggle-icon">+</span></div>
+                <div class="subsection-content" style="display: none;"></div>
+            </div>
+            <div class="collapsible-subsection">
+                <div class="subsection-header"><h4>Tabla</h4><span class="toggle-icon">+</span></div>
+                <div class="subsection-content" style="display: none;"></div>
+            </div>
+        </div>
+        <div id="anticipos-content" class="tab-content">
+            <div class="collapsible-subsection">
+                <div class="subsection-header"><h4>Configuración Inicial</h4><span class="toggle-icon">-</span></div>
+                <div class="subsection-content"></div>
+            </div>
+            <div class="collapsible-subsection">
+                <div class="subsection-header"><h4>Gráfico</h4><span class="toggle-icon">+</span></div>
+                <div class="subsection-content" style="display: none;"></div>
+            </div>
+            <div class="collapsible-subsection">
+                <div class="subsection-header"><h4>KPI</h4><span class="toggle-icon">+</span></div>
+                <div class="subsection-content" style="display: none;"></div>
+            </div>
+            <div class="collapsible-subsection">
+                <div class="subsection-header"><h4>Desgloses</h4><span class="toggle-icon">+</span></div>
+                <div class="subsection-content" style="display: none;"></div>
+            </div>
+            <div class="collapsible-subsection">
+                <div class="subsection-header"><h4>Tabla</h4><span class="toggle-icon">+</span></div>
+                <div class="subsection-content" style="display: none;"></div>
+            </div>
+        </div>
+        <div id="compras-content" class="tab-content">
+            <div class="collapsible-subsection">
+                <div class="subsection-header"><h4>Configuración Inicial</h4><span class="toggle-icon">-</span></div>
+                <div class="subsection-content"></div>
+            </div>
+            <div class="collapsible-subsection">
+                <div class="subsection-header"><h4>Gráfico</h4><span class="toggle-icon">+</span></div>
+                <div class="subsection-content" style="display: none;"></div>
+            </div>
+            <div class="collapsible-subsection">
+                <div class="subsection-header"><h4>KPI</h4><span class="toggle-icon">+</span></div>
+                <div class="subsection-content" style="display: none;"></div>
+            </div>
+            <div class="collapsible-subsection">
+                <div class="subsection-header"><h4>Desgloses</h4><span class="toggle-icon">+</span></div>
+                <div class="subsection-content" style="display: none;"></div>
+            </div>
+            <div class="collapsible-subsection">
+                <div class="subsection-header"><h4>Tabla</h4><span class="toggle-icon">+</span></div>
+                <div class="subsection-content" style="display: none;"></div>
+            </div>
+        </div>
     </main>
 
     <footer class="main-footer">
@@ -112,6 +251,6 @@
     
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-    <script src="script.js"></script>
+    <script src="script.js?v=2"></script>
 </body>
  </html>
