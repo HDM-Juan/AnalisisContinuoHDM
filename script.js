@@ -67,6 +67,7 @@ document.addEventListener('DOMContentLoaded', function () {
         'fecha recepción final': 'Fecha Recepción Final',
         'fecha recepcion final': 'Fecha Recepción Final',
         'fecha venta ': 'Fecha Venta',
+        'fecha ef-venta': 'Fecha Venta',
         'fecha y hora compra': 'Fecha y Hora Compra',
         'fecha compra': 'Fecha y Hora Compra',
         'sku refacción': 'Sku Refacción',
